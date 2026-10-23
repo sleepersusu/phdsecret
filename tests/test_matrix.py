@@ -67,10 +67,14 @@ def test_tags_column_when_paper_tags_exist(tmp_path):
 
 
 def test_card_missing_from_paper_tags_gets_dash(tmp_path):
-    write_card(tmp_path, "adams2021")
+    card_dir = tmp_path / "cards" / "adams2021"
+    card_dir.mkdir(parents=True)
+    data = card("adams2021", "實證研究", "LSTM")
+    data["structured"]["articleType"] = {"value": "原始研究", "quote": "q", "page": 1}
+    (card_dir / "card.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (tmp_path / "paper-tags.json").write_text("{}", encoding="utf-8")
 
     matrix.main([str(tmp_path)])
 
     lines = (tmp_path / "matrix.md").read_text(encoding="utf-8").splitlines()
-    assert lines[2].endswith("| — |")
+    assert lines[2].endswith("| 原始研究 | — |")

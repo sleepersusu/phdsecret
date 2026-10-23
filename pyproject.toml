@@ -1,0 +1,12 @@
+[project]
+name = "phd-lit-pipeline"
+version = "0.1.0"
+description = "文獻研究流水線的輔助腳本"
+requires-python = ">=3.11"
+dependencies = ["pypdf>=5", "python-docx>=1.1"]
+
+[dependency-groups]
+dev = ["pytest>=8", "fpdf2>=2.7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

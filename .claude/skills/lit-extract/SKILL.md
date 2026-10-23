@@ -15,7 +15,7 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 
 1. 讀 `reviews/<slug>/state.json`、`progress.md`、`protocol.md`、`papers.json`。`protocol.md` 的「執行設定」寫了甲乙用哪個模型、一次處理幾篇。
 2. 讀 `protocol.md` 的「模式」。已有提案：`uv run scripts/extract_text.py reviews/<slug> --proposal <protocol.md 記的提案檔>`；無提案：`uv run scripts/extract_text.py reviews/<slug>`（不給 `--proposal`）。
-3. 找出還沒完成的篇：`papers.json` 裡的每篇，只有 `progress.md` 已有該 `<key>` 的每篇一行（第 2 節最後才寫），或已記成例外，才算完成；其餘都要重做。不能用 `card.md` 是否存在判斷，因為第 2 節第 3 步就會產出第一版 `card.md`，那時 auditor 還沒跑。重做前先刪掉 `cards/<key>/` 裡所有產生的檔案：`a.json`、`b.json`、`diff.json`、`judge.json`、`audit.json`、`coverage.json`、`card.json`、`card.md`，讓甲乙從頭來，避免舊檔被併進新結果。這些是流水線的產出，不是本人的檔案；不碰 `pdfs/` 與 `text/`。
+3. 找出還沒完成的篇：`papers.json` 裡的每篇，只有 `progress.md` 已有該 `<key>` 的每篇一行（第 2 節最後才寫），或已記成例外，才算完成；其餘都要重做。不能用 `card.md` 是否存在判斷，因為第 2 節第 3 步就會產出第一版 `card.md`，那時 auditor 還沒跑。重做前先刪掉 `cards/<key>/` 裡所有產生的檔案：`a.json`、`b.json`、`diff.json`、`judge.json`、`audit.json`、`coverage.json`、`card.json`、`card.md`、`summary.md`，讓甲乙從頭來，避免舊檔被併進新結果。這些是流水線的產出，不是本人的檔案；不碰 `pdfs/` 與 `text/`。
 
 ## 2. 每篇的流程
 
@@ -34,8 +34,9 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 7. `uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`。仍 exit 1 → 記成例外，列出未涵蓋的節；不重派 auditor。若輸出是「沒有章節拆解」，例外寫「沒有章節拆解，無法檢查涵蓋」，不要寫成未涵蓋幾節。
 8. `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`。
 9. 第 8 步有失敗、或 `card.json` 的 `missingEvidence` 不是空的 → 派一個 subagent 修，prompt 附上失敗輸出與 `missingEvidence`：「讀 `.claude/skills/lit-extract/repair.md` 照做。slug：`<slug>`，key：`<key>`。失敗清單：…」。修完重跑第 6、7、8 步。**只修一輪**，還是不過就記成例外。
+10. 派 summarizer subagent（`model` 用乙模型）：「讀 `.claude/skills/lit-extract/summarizer.md` 照做。slug：`<slug>`，key：`<key>`。」接著 `uv run scripts/summary_check.py reviews/<slug>/cards/<key>`。exit 1 → 對同一個 subagent 用 SendMessage 附上輸出請它修，修完再跑一次。**只修一輪**，還是不過就記成例外。第 9 步修過卡片的，摘要在修完之後才寫。
 
-每篇做完，在 `progress.md` 追加一行：`<key>：不一致 <n> 欄（judge 解決 <n>、待裁決 <n>）、補漏 <n> 項、無項目章節 <n> 節、未涵蓋 <n> 節、引文 <通過數>/<總數>（寬鬆 <n>）、修 <0 或 1> 輪`。補漏數取 `card.json` 的 `auditAdded`；無項目章節與未涵蓋數取 `coverage.json`。
+每篇做完，在 `progress.md` 追加一行：`<key>：不一致 <n> 欄（judge 解決 <n>、待裁決 <n>）、補漏 <n> 項、無項目章節 <n> 節、未涵蓋 <n> 節、引文 <通過數>/<總數>（寬鬆 <n>）、修 <0 或 1> 輪、摘要 <通過／例外>`。補漏數取 `card.json` 的 `auditAdded`；無項目章節與未涵蓋數取 `coverage.json`。
 
 ## 3. 收尾
 

@@ -28,6 +28,7 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
    - 範圍是部分引文：只把那幾則引文移過去，條目留在 `proposal-gaps.md`。
 3. 有部分推翻的條目時，派一個 general-purpose subagent（`model` 用甲模型）：「讀 `reviews/<slug>/gaps-review.md` 與 `proposal-gaps-rejected.md`，把 `proposal-gaps.md` 裡被撤掉部分引文的條目改寫成只講剩下引文撐得住的；不新增引文，不動其他條目。slug：`<slug>`。」
 4. 再跑一次 `quote_check.py`，必須 0 失敗；數字寫進 `progress.md`。
+5. `uv run scripts/reading_order.py reviews/<slug>`（產出 `reading-order.md`，停 2 呈現）。
 
 ## 3. 停 2（本人在場）
 
@@ -36,7 +37,7 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 1. 一句話：幾篇、幾張卡片、幾條缺口（有支撐、已有人做過、沒提到、衝突各幾條）。
 2. **例外與待裁決**（列在最前面）：`progress.md` 的例外、卡片的「待本人裁決」欄位、章節未涵蓋的篇、`references.csv` 的模糊合併筆數、BibTeX 失敗的篇、`tag-merge-report.json` 被拒絕的標籤提議。
 3. 驗證數字：卡片引文通過數／總數、補漏總數（各卡 `auditAdded` 加總）、未涵蓋章節總數、缺口清單引文通過數／總數、整條撤回幾條、撤掉部分引文幾條。
-4. 檔案位置：`matrix.md`、`proposal-gaps.md`、`references.csv`、`cards/`。
+4. 檔案位置：`reading-order.md`、`matrix.md`、`proposal-gaps.md`、`references.csv`、`cards/`。加一句「建議從 `reading-order.md` 開始讀，每篇先看 `summary.md` 再看 `card.md`」。
 5. 「提案沒提到」與「建議補讀」逐條列出（這兩類最可能改變提案）。
 6. 標籤歸併摘要：本批新增的類別、被歸進既有類別的寫法（看 `tag-merge-report.json` 的 `accepted`）、被拒絕的提議、`paper-tags.json` 的 `unmapped`。提醒本人：改類別編輯 `library/tags.json`（改過的設 `"source": "user"`），改單篇編輯 `reviews/<slug>/tag-overrides.json`，改完重跑 `uv run scripts/apply_tags.py reviews/<slug>` 與 `matrix.py`。
 
@@ -52,6 +53,7 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 4. `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/research-gaps.md`。有失敗 → 對同一個 subagent 用 SendMessage 附上失敗輸出請它修，修完再跑一次。**只修一輪**，還是不過的條目移到 `research-gaps-rejected.md` 的「## 引文核對不過」小節，保留原文與失敗原因。
 5. 派另一個 general-purpose subagent（`model` 用乙模型）：「讀 `.claude/skills/lit-gaps/landscape-refuter.md` 照做。slug：`<slug>`。」讀 `research-gaps-review.md`，條數不符時請它補查。推翻的移到 `research-gaps-rejected.md` 的「## 已撤回」小節並附理由：整條推翻整條移、部分推翻只移那幾則引文。有部分推翻時，派甲模型 subagent 把那些條目改寫成只講剩下引文撐得住的，不新增引文、不動其他條目。
 6. 再跑一次 `quote_check.py`，必須 0 失敗；數字寫進 `progress.md`。
+7. `uv run scripts/reading_order.py reviews/<slug>`（無提案模式以研究空白引用次數排序）。
 
 ## 5. 停 2：研究空白與設計選項（無提案模式，本人在場）
 
@@ -61,7 +63,7 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 
 `state.json` 改成 `stop2`，`note` 寫「停 2：研究空白備妥，等本人看」。
 
-1. 一次呈現：一句話（幾篇、幾張卡片、研究空白各類幾條）；例外與待裁決（同第 3 節第 2 點）；驗證數字（卡片引文、補漏總數、未涵蓋章節、研究空白引文通過數、撤回條數）；檔案位置（`matrix.md`、`research-gaps.md`、`references.csv`、`cards/`）；「沒人做過的組合」與「建議補讀」逐條；標籤歸併摘要（同第 3 節第 6 點）。
+1. 一次呈現：一句話（幾篇、幾張卡片、研究空白各類幾條）；例外與待裁決（同第 3 節第 2 點）；驗證數字（卡片引文、補漏總數、未涵蓋章節、研究空白引文通過數、撤回條數）；檔案位置（`reading-order.md`、`matrix.md`、`research-gaps.md`、`references.csv`、`cards/`；建議從 `reading-order.md` 開始讀）；「沒人做過的組合」與「建議補讀」逐條；標籤歸併摘要（同第 3 節第 6 點）。
 2. 派 general-purpose subagent（`model` 用甲模型）：「讀 `.claude/skills/lit-gaps/design-options.md` 照做。slug：`<slug>`。」跑 `quote_check.py reviews/<slug> reviews/<slug>/design-options.md`，失敗修一輪，仍不過的那一點標「⚠ 引文未核對通過」。
 3. 把 2～3 個方向呈現給本人，請本人選一個，或要求合併、重提。
 4. 用 `grilling` 一次一題追問選定的方向（研究問題夠不夠具體、資料拿不拿得到、跟既有研究差在哪、做得完嗎），每題附建議答案，依本人的回答修正。

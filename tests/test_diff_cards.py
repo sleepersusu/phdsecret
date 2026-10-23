@@ -170,3 +170,21 @@ def test_main_writes_structured_and_narrative_disagreements(tmp_path):
     written = json.loads((tmp_path / "diff.json").read_text(encoding="utf-8"))
     assert code == 0
     assert [d["field"] for d in written["disagreements"]] == ["methods", "limitations"]
+
+
+def test_article_type_must_match_exactly():
+    a = structured(articleType=item("原始研究", 1))
+    b = structured(articleType=item("系統性回顧", 1))
+
+    assert [d["field"] for d in diff_cards.compare(a, b)] == ["articleType"]
+
+
+def test_topics_are_not_compared():
+    a = structured(topics=[item("失智症", 1)])
+    b = structured(topics=[item("Dementia", 1), item("穿戴式裝置", 2)])
+
+    assert diff_cards.compare(a, b) == []
+
+
+def test_name_key_ignores_case_and_punctuation():
+    assert diff_cards.name_key("MIMIC-IV") == diff_cards.name_key("mimic iv")

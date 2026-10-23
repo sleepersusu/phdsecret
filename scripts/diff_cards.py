@@ -11,12 +11,11 @@ from decimal import Decimal
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from cardschema import DUAL_NARRATIVE, STRUCTURED, field_items
+from cardschema import DUAL_NARRATIVE, STRUCTURED, field_items, name_key
 from textnorm import loosen
 
 NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 THOUSANDS = re.compile(r"^\d{1,3}(?:,\d{3})+(?:\.\d+)?$")
-NON_WORD = re.compile(r"[\W_]+")
 MIN_SHARED_CHARS = 25
 
 
@@ -120,8 +119,8 @@ def _compare_enum(a_items, b_items):
 
 def _compare_names(a_items, b_items):
     return _set_detail(
-        {_name_key(item["value"]): item["value"] for item in a_items},
-        {_name_key(item["value"]): item["value"] for item in b_items},
+        {name_key(item["value"]): item["value"] for item in a_items},
+        {name_key(item["value"]): item["value"] for item in b_items},
     )
 
 
@@ -135,10 +134,6 @@ def _set_detail(a_map, b_map):
     if not only_a and not only_b:
         return None
     return f"只有甲：{', '.join(sorted(only_a)) or '—'}；只有乙：{', '.join(sorted(only_b)) or '—'}"
-
-
-def _name_key(name):
-    return NON_WORD.sub("", name.casefold())
 
 
 def _numbers(items):

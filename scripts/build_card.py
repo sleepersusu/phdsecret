@@ -24,7 +24,7 @@ def main(argv=None):
     card_dir = Path(argv[0])
     card = _load(card_dir / "a.json")
     _merge_topics(card, _load(card_dir / "b.json", {}))
-    diff =_load(card_dir / "diff.json", {"disagreements": []})
+    diff = _load(card_dir / "diff.json", {"disagreements": []})
     judge = _load(card_dir / "judge.json", {"decisions": []})
     audit = _load(card_dir / "audit.json", {})
 
@@ -91,7 +91,7 @@ def _merge_topics(card, other):
     mine = structured.get(TOPICS) or []
     seen = {name_key(t.get("value")) for t in mine}
     extra = []
-    for topic in other.get("structured", {}).get(TOPICS) or []:
+    for topic in (other.get("structured") or {}).get(TOPICS) or []:
         key = name_key(topic.get("value"))
         if key and key not in seen:
             seen.add(key)
@@ -109,8 +109,14 @@ def _apply_judge(card, diff, judge):
         if decision is None:
             pending.append({"field": field, "reason": "judge 沒有裁決這個欄位"})
         elif decision.get("status") == "resolved":
+            value = decision["value"]
+            if field in SINGLE_VALUE_FIELDS and isinstance(value, list):
+                if len(value) != 1:
+                    pending.append({"field": field, "reason": f"judge 對單值欄位給了 {len(value)} 個值，請本人確認"})
+                    continue
+                value = value[0]
             target = "structured" if field in STRUCTURED_FIELDS else "narrative"
-            card.setdefault(target, {})[field] = decision["value"]
+            card.setdefault(target, {})[field] = value
         else:
             pending.append({"field": field, "reason": decision.get("reason", "judge 判不出來")})
     return pending

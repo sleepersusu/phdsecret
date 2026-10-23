@@ -257,3 +257,64 @@ def test_audit_addition_to_existing_article_type_is_pending(tmp_path):
     built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
     assert built["structured"]["articleType"]["value"] == "原始研究"
     assert [p["field"] for p in built["pending"]] == ["articleType"]
+
+
+def test_judge_single_item_list_for_article_type_is_unwrapped(tmp_path):
+    card = full_card()
+    card["structured"]["articleType"] = item("原始研究", 1)
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "diff.json", {"disagreements": [{"field": "articleType"}]})
+    write(tmp_path, "judge.json", {"decisions": [
+        {"field": "articleType", "status": "resolved", "value": [item("系統性回顧", 1)], "reason": "乙正確"}
+    ]})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert built["structured"]["articleType"]["value"] == "系統性回顧"
+    assert built["pending"] == []
+    assert "- 文章類型：系統性回顧" in (tmp_path / "card.md").read_text(encoding="utf-8")
+
+
+def test_judge_multi_item_list_for_single_value_field_is_pending(tmp_path):
+    card = full_card()
+    card["structured"]["articleType"] = item("原始研究", 1)
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "diff.json", {"disagreements": [{"field": "articleType"}]})
+    write(tmp_path, "judge.json", {"decisions": [
+        {"field": "articleType", "status": "resolved",
+         "value": [item("系統性回顧", 1), item("統合分析", 1)], "reason": "兩者皆是"}
+    ]})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert built["structured"]["articleType"]["value"] == "原始研究"
+    assert built["pending"] == [{"field": "articleType", "reason": "judge 對單值欄位給了 2 個值，請本人確認"}]
+
+
+def test_judge_empty_list_for_single_value_field_is_pending(tmp_path):
+    card = full_card()
+    card["structured"]["articleType"] = item("原始研究", 1)
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "diff.json", {"disagreements": [{"field": "articleType"}]})
+    write(tmp_path, "judge.json", {"decisions": [
+        {"field": "articleType", "status": "resolved", "value": [], "reason": "x"}
+    ]})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert built["pending"] == [{"field": "articleType", "reason": "judge 對單值欄位給了 0 個值，請本人確認"}]
+
+
+def test_topics_with_null_structured_in_b_json_do_not_raise(tmp_path):
+    card = full_card()
+    card["structured"]["topics"] = [item("失智症", 1)]
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "b.json", {"key": "smith2023", "structured": None})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert [t["value"] for t in built["structured"]["topics"]] == ["失智症"]

@@ -106,3 +106,13 @@ def test_main_exits_one_without_structure(tmp_path):
     write(tmp_path, "card.json", card([]))
 
     assert coverage_check.main([str(tmp_path)]) == 1
+
+
+def test_topics_are_not_counted_toward_section_coverage():
+    only_topic = card([section("5 Discussion", 9, 11)])
+    only_topic["structured"]["topics"] = [item("失智症", 10)]
+
+    result = coverage_check.check(only_topic, {})
+
+    assert [s["items"] for s in result["sections"]] == [0]
+    assert result["uncovered"] == ["5 Discussion"]

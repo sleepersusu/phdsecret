@@ -7,14 +7,16 @@
 """
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 
 def merge(library, proposals):
     """回傳 (新字典, 接受清單, 拒絕清單)；不修改傳入的 library。"""
     tags = {
-        name: {"synonyms": list(entry.get("synonyms", [])), "source": entry.get("source", "agent")}
+        name: {**entry, "synonyms": list(entry.get("synonyms", []))}
         for name, entry in library.get("tags", {}).items()
     }
     known = {name.casefold() for name in tags} | {s.casefold() for e in tags.values() for s in e["synonyms"]}
@@ -26,7 +28,7 @@ def merge(library, proposals):
         if reason:
             rejected.append({**proposal, "rejected": reason})
             continue
-        if proposal.get("new"):
+        if proposal.get("new") is True:
             tags[canonical] = {"synonyms": [] if raw.casefold() == canonical.casefold() else [raw], "source": "agent"}
             known.add(canonical.casefold())
         else:
@@ -50,8 +52,9 @@ def main(argv=None):
 
     tags, accepted, rejected = merge(library, proposals)
 
-    library_dir.mkdir(parents=True, exist_ok=True)
-    library_path.write_text(json.dumps(tags, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if accepted:
+        library_dir.mkdir(parents=True, exist_ok=True)
+        _write_atomic(library_path, json.dumps(tags, ensure_ascii=False, indent=2) + "\n")
     report = {"accepted": accepted, "rejected": rejected}
     (review / "tag-merge-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"接受 {len(accepted)}、拒絕 {len(rejected)}")
@@ -65,13 +68,26 @@ def _rejection(tags, known, raw, canonical, new):
         return "raw 或 canonical 是空的"
     if raw.casefold() in known:
         return "這個寫法已在字典裡"
-    if new:
+    if new is True:
         return "標成新類別，但類別名已在字典裡" if canonical.casefold() in known else None
     if canonical not in tags:
         return "標成歸入既有類別，但字典沒有這個類別"
-    if tags[canonical]["source"] == "user":
+    if tags[canonical].get("source") != "agent":
         return "本人管理的類別，不由 agent 擴充"
     return None
+
+
+def _write_atomic(path, text):
+    """先寫同目錄的暫存檔再 os.replace，避免寫到一半留下壞掉的字典。"""
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 def _parse_args(argv):

@@ -3,6 +3,12 @@
 用法：uv run scripts/summary_check.py reviews/<slug>/cards/<key>
 讀 summary.md 與 card.json。摘要只能改寫卡片裡核對過的項目，所以每句都要指回卡片；
 四塊必須涵蓋，避免摘要只挑好話講（卡片上該塊本來就空的不強制）。有問題 exit 1。
+
+標記不能指向還沒核對通過的項目：card.json 的 missingEvidence 列出的項目（路徑 0 起算，
+對應標記 1 起算），以及 pending 列出的欄位（整個欄位）。CLAUDE.md 允許摘要不附逐字引文，
+前提是標記指向的項目已帶核對過的引文；指向未核對項目就破壞了這個前提。
+同理，某一塊要求涵蓋的條件是卡片上至少有一個「已核對」的項目；全是未核對的就不強制，
+免得「四塊都要涵蓋」與「不引用未核對項目」互相衝突。
 """
 import json
 import re
@@ -12,6 +18,7 @@ from pathlib import Path
 from cardschema import DUAL_NARRATIVE, SINGLE_VALUE_FIELDS, STRUCTURED, TOPICS, field_items
 
 MARKER = re.compile(r"\[([A-Za-z]+(?:\.[^\]#]+)?)(?:#(\d+))?\]")
+MISSING_PATH = re.compile(r"^(structured|narrative)\.(custom\.[^\[]+|[A-Za-z]+)(?:\[(\d+)\])?")
 SENTENCE_BREAK = re.compile(r"(?<=[。！？])|(?<=\.)\s+|\n+")
 STRUCTURED_FIELDS = {field for field, _, _ in STRUCTURED}
 BLOCKS = [
@@ -25,6 +32,7 @@ BLOCKS = [
 def check(text, card):
     """回傳問題清單；空清單代表通過。"""
     problems, used = [], set()
+    bad_items, bad_fields = _unverified(card)
     for sentence in _sentences(text):
         markers = MARKER.findall(sentence)
         if not markers:
@@ -33,11 +41,14 @@ def check(text, card):
         for field, number in markers:
             index = int(number) if number else None
             if _resolves(card, field, index):
-                used.add(field)
+                if field in bad_fields or (field, index) in bad_items:
+                    problems.append(f"標記指向未核對的項目：[{field}#{number}]" if number else f"標記指向未核對的項目：[{field}]")
+                else:
+                    used.add(field)
             else:
                 problems.append(f"標記無效：[{field}#{number}]" if number else f"標記無效：[{field}]")
     for block, fields in BLOCKS:
-        if any(_items(card, f) for f in fields) and not used.intersection(fields):
+        if any(_has_verified(card, f, bad_items, bad_fields) for f in fields) and not used.intersection(fields):
             problems.append(f"缺少{block}")
     return problems
 
@@ -58,6 +69,24 @@ def main(argv=None):
         return 1
     print(f"{key}: 摘要通過")
     return 0
+
+
+def _unverified(card):
+    """回傳 ({(欄位, 1 起算編號或 None)}, {整欄待裁決的欄位})。"""
+    items = set()
+    for path in card.get("missingEvidence") or []:
+        m = MISSING_PATH.match(path)
+        if m:
+            items.add((m.group(2), int(m.group(3)) + 1 if m.group(3) else None))
+    return items, {p.get("field") for p in card.get("pending") or []}
+
+
+def _has_verified(card, field, bad_items, bad_fields):
+    if field in bad_fields:
+        return False
+    if field in SINGLE_VALUE_FIELDS:
+        return bool(_items(card, field)) and (field, None) not in bad_items
+    return any((field, n) not in bad_items for n in range(1, len(_items(card, field)) + 1))
 
 
 def _sentences(text):

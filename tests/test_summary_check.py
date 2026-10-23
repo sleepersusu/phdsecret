@@ -112,3 +112,56 @@ def test_main_without_summary_exits_one(tmp_path):
     (tmp_path / "card.json").write_text(json.dumps(card(), ensure_ascii=False), encoding="utf-8")
 
     assert summary_check.main([str(tmp_path)]) == 1
+
+
+def test_marker_to_missing_evidence_item_is_rejected():
+    c = card()
+    c["missingEvidence"] = ["narrative.findings[1]"]
+
+    problems = summary_check.check(GOOD + "外部驗證下降 [findings#2]。", c)
+
+    assert problems == ["標記指向未核對的項目：[findings#2]"]
+
+
+def test_marker_to_pending_list_field_is_rejected():
+    c = card()
+    c["pending"] = [{"field": "methods", "reason": "x"}]
+
+    problems = summary_check.check(GOOD, c)
+
+    assert problems == ["標記指向未核對的項目：[methods#1]"]
+
+
+def test_marker_to_pending_single_value_field_is_rejected():
+    c = card()
+    c["pending"] = [{"field": "articleType", "reason": "x"}]
+
+    problems = summary_check.check(GOOD + "這是原始研究 [articleType]。", c)
+
+    assert problems == ["標記指向未核對的項目：[articleType]"]
+
+
+def test_block_with_only_unverified_items_is_not_required():
+    c = card()
+    c["missingEvidence"] = ["narrative.limitations[0]"]
+    text = "這篇想知道能否提早預測 [researchQuestion#1]。作者用 Transformer [methods#1]。結果比既有分數好 [findings#1]。"
+
+    assert summary_check.check(text, c) == []
+
+
+def test_marker_to_unverified_custom_item_is_rejected():
+    c = card()
+    c["missingEvidence"] = ["narrative.custom.Source of data[0]"]
+
+    problems = summary_check.check(GOOD + "資料是回溯性的 [custom.Source of data#1]。", c)
+
+    assert problems == ["標記指向未核對的項目：[custom.Source of data#1]"]
+
+
+def test_proposal_quote_suffix_still_marks_item_unverified():
+    c = card(proposalRelation=[note("與提案相關")])
+    c["missingEvidence"] = ["narrative.proposalRelation[0].proposalQuote"]
+
+    problems = summary_check.check(GOOD + "與提案相關 [proposalRelation#1]。", c)
+
+    assert problems == ["標記指向未核對的項目：[proposalRelation#1]"]

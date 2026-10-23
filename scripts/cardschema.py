@@ -17,6 +17,9 @@ NARRATIVE = [
     ("limitations", "限制"),
 ]
 
+# 甲乙都寫、要比對的敘述欄位；custom 與 structure 只有甲寫，不比對。
+DUAL_NARRATIVE = [field for field, _ in NARRATIVE] + ["proposalRelation"]
+
 
 def field_items(value):
     """studyType 是單一物件，其餘結構化欄位是清單；統一成清單處理。"""

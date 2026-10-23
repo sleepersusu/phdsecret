@@ -25,7 +25,7 @@ description: 流水線的停 1：開一個新的文獻 review（例：教授給�
 2. 狀態不是「可讀」的檔案記成例外，第 4 步一次告訴本人。
 3. 已有提案：`uv run scripts/extract_text.py reviews/<slug> --proposal proposal/<提案檔>`；無提案：`uv run scripts/extract_text.py reviews/<slug>`。論文（與提案）的純文字放進 `text/`。提案格式不支援時，請本人另存成 .docx、.pdf 或 .md。
 4. 確認每篇的 id：盤點抓到的 DOI、arXiv ID 只是候選，前兩頁也可能出現別篇的 DOI。讀 `text/<key>.txt` 第一頁取得標題與作者，再查 `https://doi.org/<doi>` 或 `https://arxiv.org/abs/<id>`，標題相符才算確認；沒有候選就用標題查（有 `paper-lookup` 就用它）。確認不了的標「id 待確認」。
-5. 寫 `reviews/<slug>/papers.json`：`[{"key": "...", "id": "DOI 或 arXiv:xxxx.xxxxx", "title": "..."}]`，只收可讀的篇。
+5. 寫 `reviews/<slug>/papers.json`：`[{"key": "...", "id": "DOI 或 arXiv:xxxx.xxxxx", "title": "..."}]`，只收可讀的篇。寫完跑 `uv run scripts/library_lookup.py reviews/<slug>`，以前在別批讀過的篇會列進 `known.json`。
 6. 已有提案模式：讀 `text/proposal.txt`，列出章節標題，每節寫一句大意。無提案模式跳過。
 
 ## 3. 逐題定案
@@ -46,5 +46,5 @@ description: 流水線的停 1：開一個新的文獻 review（例：教授給�
 1. 照 `protocol-template.md` 寫 `reviews/<slug>/protocol.md`。
 2. 寫 `state.json`：`stage` 為 `stop1`，`note` 寫「停 1：protocol 備妥，等本人確認」。
 3. `progress.md` 追加一筆：盤點數字、例外、定案的事。
-4. 一次呈現：模式、篇數與盤點結果（例外列最前面）、研究方向、卡片欄位、提案對照範圍、授權紀錄。問「可以開始萃取嗎」。
+4. 一次呈現：模式、篇數與盤點結果（例外列最前面）、以前讀過會沿用舊卡片的篇（`known.json`）、研究方向、卡片欄位、提案對照範圍、授權紀錄。問「可以開始萃取嗎」。
 5. 本人點頭 → `state.json` 的 `stage` 改成 `auto:extract`，接著執行 `/lit-extract`。之後萃取、參考文獻合併、對照提案會自動一路跑完，到停 2 才再找本人。

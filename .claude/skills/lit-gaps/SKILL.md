@@ -44,6 +44,8 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 
 ## 4. 研究空白整理（無提案模式，自動）
 
+接續時，輸出檔已存在且 `progress.md` 已記錄的步驟跳過，不重做（例：`research-gaps-review.md` 已處理完就跳過本節的推翻步驟）。
+
 1. 讀 `state.json`、`progress.md`、`protocol.md`。
 2. `uv run scripts/matrix.py reviews/<slug>`；`uv run scripts/combo_gaps.py reviews/<slug>`。
 3. 派 general-purpose subagent（`model` 用甲模型）：「讀 `.claude/skills/lit-gaps/landscape-analyst.md` 照做。slug：`<slug>`。」
@@ -52,6 +54,10 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 6. 再跑一次 `quote_check.py`，必須 0 失敗；數字寫進 `progress.md`。
 
 ## 5. 停 2：研究空白與設計選項（無提案模式，本人在場）
+
+開始前確認這個 session 可用 `grilling` 與 `domain-modeling`（名稱只看冒號後面）；缺了就停下來，照 `CLAUDE.md`「開工檢查」的安裝指令列出缺哪些、貼出指令，等本人裝好、重開 Claude Code 再繼續。
+
+接續時，輸出檔已存在且 `progress.md` 已記錄的步驟跳過，不重做（例：`design-options.md` 已存在就跳過第 2 步）。
 
 `state.json` 改成 `stop2`，`note` 寫「停 2：研究空白備妥，等本人看」。
 

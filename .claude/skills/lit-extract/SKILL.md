@@ -40,9 +40,11 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 ## 3. 收尾
 
 1. 標籤歸併：
-   1. 派 tag-normalizer subagent（`model` 用乙模型）：「讀 `.claude/skills/lit-extract/tag-normalizer.md` 照做。slug：`<slug>`。」回 `BLOCKED` → 記成例外，跳過 2。
+   1. 先刪掉舊的 `reviews/<slug>/tag-proposals.json`（重跑時才會重新產生，不然舊提議會全部回「這個寫法已在字典裡」）。派 tag-normalizer subagent（`model` 用乙模型）：「讀 `.claude/skills/lit-extract/tag-normalizer.md` 照做。slug：`<slug>`。」回 `BLOCKED` → 記成例外，跳過本點第 2 小步（merge_tags），仍跑第 3 小步（apply_tags 用現有字典）。
    2. `uv run scripts/merge_tags.py reviews/<slug>`。被拒絕的提議會列在 `tag-merge-report.json`，到停 2 呈現，不重派。
    3. `uv run scripts/apply_tags.py reviews/<slug>`。
+   - merge_tags 或 apply_tags exit 非 0 → 記成例外，繼續下一點（matrix）。
+   - `progress.md` 追加一行標籤歸併數字：提議 <n>、接受 <n>、拒絕 <n>、unmapped <n>（取自 `tag-merge-report.json` 與 `paper-tags.json`）。
 2. `uv run scripts/matrix.py reviews/<slug>`。
 3. 對每張卡片再跑一次 `quote_check.py`，數字寫進 `progress.md`。
 4. 例外（BLOCKED、修過仍不過、待本人裁決的欄位、章節未涵蓋）整理成一段，追加到 `progress.md` 的「例外」小節。

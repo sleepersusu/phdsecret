@@ -21,6 +21,7 @@
 
 - 標了（補漏）（`source: audit`）的項目 → 改 `audit.json` 的 `additions.<欄位>`（含 `custom.<名稱>`）。若這一項只是重複卡片已有的項目 → 直接從 `audit.json` 刪掉。
 - 欄位（結構化或敘述）在 `judge.json` 有 `resolved` 裁決 → 改 `judge.json` 裡的 `value`。
+- `structured.topics` 的項目只在 `b.json`（不在 `a.json`）時 → 修 `b.json`；要刪就從 `b.json` 刪（build_card 會把 b.json 的標籤接在甲的後面，改 a.json 不會生效）。
 - 其餘 → 改 `a.json`。
 
 ## 回報

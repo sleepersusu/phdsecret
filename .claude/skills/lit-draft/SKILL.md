@@ -9,7 +9,7 @@ description: 流水線的撰寫段：依 doc-coauthoring 的流程跟本人一�
 
 ## 0. 開工檢查
 
-照 `CLAUDE.md`「開工檢查」的「撰寫」列。另外確認 `protocol.md`「授權與規範」已記本人同意處理提案；沒有記就先問本人，記下來再往下。`scientific-writing`、`peer-review` 要求確認授權時，以這筆紀錄回答。
+照 `CLAUDE.md`「開工檢查」的「撰寫」列。另外確認 `protocol.md`「授權與規範」已記本人同意處理提案；沒有記就先問本人，記下來再往下。無提案模式沒有提案同意要確認；改成（`protocol.md`「授權與規範」還沒記的話）問一次本人，是否同意讓 `scientific-writing` 與 `peer-review` 處理他在這條流水線裡寫的第一版提案草稿，連同日期記在「授權與規範」。`scientific-writing`、`peer-review` 要求確認授權時，以這筆紀錄回答。
 
 ## 1. 收集脈絡（照 doc-coauthoring 第一階段）
 

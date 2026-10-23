@@ -2,7 +2,8 @@
 
 用法：uv run scripts/build_card.py reviews/<slug>/cards/<key>
 diff.json 列出的不一致欄位，judge 判不出來或沒裁決的，記進 pending；
-auditor 補到卡片沒有的欄位、或對已有的研究類型提出補充，也記進 pending（研究類型只能有一個，要人看）；
+甲乙各自下的領域標籤（structured.topics）不比對，取聯集：b.json 裡名稱不重複的接在甲的後面。
+auditor 補到卡片沒有的欄位、或對已有值的單值欄位（研究類型、文章類型）提出補充，也記進 pending（單值欄位只能有一個，要人看）；
 引文空白、頁碼不對、引文含雙引號或換行的，記進 missingEvidence。兩者都會在 card.md 標 ⚠。
 補漏項目帶 source=audit，card.md 標「（補漏）」，讓人知道哪些是第二輪才找到的。
 """
@@ -10,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from cardschema import DUAL_NARRATIVE, NARRATIVE, STRUCTURED, field_items
+from cardschema import DUAL_NARRATIVE, NARRATIVE, SINGLE_VALUE_FIELDS, STRUCTURED, TOPICS, field_items, name_key
 
 NOT_MENTIONED = "- 原文未提及"
 FORBIDDEN_IN_QUOTE = ('"', "“", "”", "\n")
@@ -22,7 +23,8 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     card_dir = Path(argv[0])
     card = _load(card_dir / "a.json")
-    diff = _load(card_dir / "diff.json", {"disagreements": []})
+    _merge_topics(card, _load(card_dir / "b.json", {}))
+    diff =_load(card_dir / "diff.json", {"disagreements": []})
     judge = _load(card_dir / "judge.json", {"decisions": []})
     audit = _load(card_dir / "audit.json", {})
 
@@ -41,6 +43,7 @@ def render(card):
     structured = card.get("structured", {})
     narrative = card.get("narrative", {})
     study = structured.get("studyType")
+    article = structured.get("articleType")
 
     lines = [
         f"# {card.get('title') or key}",
@@ -48,7 +51,9 @@ def render(card):
         f"- id：{card.get('id') or '待確認'}",
         f"- 檔案：{key}.pdf",
         f"- 研究類型：{study['value']} {_cite(key, study)}" if study else "- 研究類型：原文未提及",
+        f"- 文章類型：{article['value']} {_cite(key, article)}" if article else "- 文章類型：原文未提及",
     ]
+    _section(lines, "## 領域標籤", key, structured.get(TOPICS), "value")
     _section(lines, "## 研究問題", key, narrative.get("researchQuestion"), "text")
     lines += ["", "## 研究設計"]
     _section(lines, "### 資料來源", key, structured.get("dataSources"), "value")
@@ -80,6 +85,21 @@ def _load(path, default=None):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _merge_topics(card, other):
+    """甲乙的標籤取聯集；名稱正規化後相同的只留甲的那筆。"""
+    structured = card.setdefault("structured", {})
+    mine = structured.get(TOPICS) or []
+    seen = {name_key(t.get("value")) for t in mine}
+    extra = []
+    for topic in other.get("structured", {}).get(TOPICS) or []:
+        key = name_key(topic.get("value"))
+        if key and key not in seen:
+            seen.add(key)
+            extra.append(topic)
+    if mine or extra:
+        structured[TOPICS] = mine + extra
+
+
 def _apply_judge(card, diff, judge):
     decisions = {d["field"]: d for d in judge.get("decisions", [])}
     pending = []
@@ -103,11 +123,11 @@ def _apply_audit(card, audit, pending):
         items = [dict(item, source="audit") for item in items]
         structured = card.setdefault("structured", {})
         narrative = card.setdefault("narrative", {})
-        if field == "studyType":
-            if structured.get("studyType") or not items:
-                pending.append({"field": field, "reason": "auditor 對研究類型提出補充；研究類型只能有一個，請本人確認"})
+        if field in SINGLE_VALUE_FIELDS:
+            if structured.get(field) or not items:
+                pending.append({"field": field, "reason": "auditor 對單值欄位提出補充；這個欄位只能有一個值，請本人確認"})
                 continue
-            structured["studyType"] = items[0]
+            structured[field] = items[0]
             added += 1
             continue
         if field.startswith("custom."):
@@ -137,6 +157,11 @@ def _missing_evidence(card):
             flagged += [prefix] if not _has_evidence(value) else []
         else:
             flagged += [f"{prefix}[{i}]" for i, item in enumerate(field_items(value)) if not _has_evidence(item)]
+
+    flagged += [
+        f"structured.{TOPICS}[{i}]" for i, item in enumerate(card.get("structured", {}).get(TOPICS) or [])
+        if not _has_evidence(item)
+    ]
 
     narrative = card.get("narrative", {})
     for field, _ in NARRATIVE:

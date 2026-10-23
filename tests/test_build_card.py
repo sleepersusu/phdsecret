@@ -186,3 +186,74 @@ def test_without_audit_file_audit_added_is_zero(tmp_path):
     md = (tmp_path / "card.md").read_text(encoding="utf-8")
     assert card["auditAdded"] == 0
     assert "（補漏）" not in md
+
+
+def test_topics_are_union_of_both_extractors(tmp_path):
+    card = full_card()
+    card["structured"]["topics"] = [item("失智症", 1), item("Wearable devices", 2)]
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "b.json", {"key": "smith2023", "structured": {
+        "topics": [item("wearable-devices", 2), item("介入研究", 3)]}})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert [t["value"] for t in built["structured"]["topics"]] == ["失智症", "Wearable devices", "介入研究"]
+
+
+def test_topics_without_b_json_keep_a_only(tmp_path):
+    card = full_card()
+    card["structured"]["topics"] = [item("失智症", 1)]
+    write(tmp_path, "a.json", card)
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert [t["value"] for t in built["structured"]["topics"]] == ["失智症"]
+
+
+def test_renders_article_type_and_topics(tmp_path):
+    card = full_card()
+    card["structured"]["articleType"] = item("原始研究", 1)
+    card["structured"]["topics"] = [item("失智症", 1)]
+    write(tmp_path, "a.json", card)
+
+    build_card.main([str(tmp_path)])
+
+    md = (tmp_path / "card.md").read_text(encoding="utf-8")
+    assert '- 文章類型：原始研究 "we report 原始研究" [smith2023, p.1]' in md
+    assert '## 領域標籤\n- 失智症 "we report 失智症" [smith2023, p.1]' in md
+
+
+def test_missing_article_type_says_not_mentioned(tmp_path):
+    write(tmp_path, "a.json", full_card())
+
+    build_card.main([str(tmp_path)])
+
+    md = (tmp_path / "card.md").read_text(encoding="utf-8")
+    assert "- 文章類型：原文未提及" in md
+    assert "## 領域標籤\n- 原文未提及" in md
+
+
+def test_topic_without_evidence_is_flagged(tmp_path):
+    card = full_card()
+    card["structured"]["topics"] = [{"value": "失智症", "quote": "", "page": 1}]
+    write(tmp_path, "a.json", card)
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert built["missingEvidence"] == ["structured.topics[0]"]
+
+
+def test_audit_addition_to_existing_article_type_is_pending(tmp_path):
+    card = full_card()
+    card["structured"]["articleType"] = item("原始研究", 1)
+    write(tmp_path, "a.json", card)
+    write(tmp_path, "audit.json", {"additions": {"articleType": [item("系統性回顧", 1)]}})
+
+    build_card.main([str(tmp_path)])
+
+    built = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert built["structured"]["articleType"]["value"] == "原始研究"
+    assert [p["field"] for p in built["pending"]] == ["articleType"]

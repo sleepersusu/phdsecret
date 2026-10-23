@@ -94,3 +94,15 @@ stdout 摘要：篇數、跨 2 批以上的篇數、未索引篇數、參考文�
 
 - 新增：`scripts/paperid.py`、`scripts/library_build.py`、`scripts/library_lookup.py`、對應測試、`lit-extract/extractor-relation.md`。
 - 修改：`scripts/merge_refs.py`、`scripts/diff_cards.py`、`lit-protocol/SKILL.md`、`lit-extract/SKILL.md`、`lit-gaps/SKILL.md`、`CLAUDE.md`。
+
+## 2026-10-24 更新（配合子專案 5、2，本人已確認）
+
+以下覆寫上文對應段落：
+
+1. **無提案模式沿用**：不派甲乙重做 `proposalRelation`，直接設為 `[]`；`diff_cards --fields` 只用於已有提案模式。
+2. **沿用的卡片保留分類與摘要**：`articleType`、`topics` 隨卡片複製；標籤照常經 `tag-normalizer → merge_tags → apply_tags` 歸併。來源的 `summary.md` 一併複製，重跑 `summary_check.py`，不過才重寫。
+3. **複製由腳本做**：新增 `scripts/reuse_card.py reviews/<slug> <key> --source <review>/<key> [--clear-relation]`：把來源 `card.json` 寫成本批 `cards/<key>/a.json`（`key` 改為新 key，刪除 `pending`、`missingEvidence`、`auditAdded`；`--clear-relation` 時 `narrative.proposalRelation` 設為 `[]`），來源有 `summary.md` 就一併複製。主控不手寫卡片內容。
+4. **文獻庫多帶分類**：`library/index.json` 每篇另記 `articleType` 與 `tags`（取 `primary` 所屬批次的 `paper-tags.json`，沒有就取卡片的 `articleType`、`tags` 為 `[]`）；`library/matrix.md` 欄位為：論文、各結構化欄位（含文章類型）、標籤、批次。
+5. **保護標籤字典**：`library_build.py` 只寫 `index.json`、`matrix.md`、`references.csv`，絕不讀寫同資料夾的 `tags.json`；測試確認 `tags.json` 內容不變、不存在時也不被建立。
+6. **跨批參考文獻的來源**：讀各批已去重、已核對的 `references.csv`，把每列依 `citedBy` 展開為 `<review>/<key>` 的引用，再以 `merge_refs` 的 `_group`／`_rows` 合併（import 重用）。
+7. `paperid` 另提供 `normalize_doi(value)`（即原 `merge_refs._doi`）與 `doi_aliases(raw)`（arXiv 轉成 `10.48550/arxiv.<id>`，PMID 回空集合），供 `merge_refs` 取代 `_doi`、`_paper_dois`。

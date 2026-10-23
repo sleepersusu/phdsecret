@@ -19,7 +19,7 @@
 - 讀：`cards/<key>/card.json`、`protocol.md`（卡片語言）。**不讀全文。**
 - 寫：`cards/<key>/summary.md`，一段 5～8 句。
 - 每句句末附一或多個來源標記 `[<欄位>#<n>]`，`n` 從 1 起算，指向 `card.json` 該欄位清單的第 n 項。
-  - 可用欄位：結構化（`studyType` 不帶編號，寫 `[studyType]`）、敘述欄位、`custom.<名稱>`。
+  - 可用欄位：結構化（單值欄位 `studyType`、`articleType` 不帶編號，寫 `[studyType]`、`[articleType]`）、`topics`（`[topics#n]`，對 `structured.topics`）、敘述欄位、`custom.<名稱>`。
 - 只能改寫標記所指項目的內容，不加卡片沒有的事實、不加評論。
 - 回報：`DONE <key>：<n> 句`。
 
@@ -46,19 +46,25 @@ exit 1 → 對同一個 summarizer 用 SendMessage 附上失敗輸出修一輪 �
 
 ### 位置與時機
 
-參考文獻合併段（`lit-refs`）收尾，`merge_refs.py` 之後（需要 `references.csv`）。
+對照提案段（`lit-gaps`）的最後、停 2 呈現之前，兩種模式都做（需要 `references.csv`，無提案模式另需 `research-gaps.md`）。閱讀順序在停 2 呈現給本人。
+
+（2026-10-24 更新：原設計放在參考文獻合併段收尾；子專案 5 加入無提案模式後，第 3 個排序訊號需要研究空白，故移到停 2 之前。）
 
 ### `reading_order.py`（新增）
 
 用法：`uv run scripts/reading_order.py reviews/<slug>`
 
-讀 `papers.json`、`cards/<key>/card.json`、`references.csv`，寫 `reviews/<slug>/reading-order.md`。
+讀 `papers.json`、`cards/<key>/card.json`、`references.csv`、`protocol.md`（模式），無提案模式另讀 `research-gaps.md`；寫 `reviews/<slug>/reading-order.md`。
+
+模式：`protocol.md` 中出現 `模式：無提案` 即為無提案，否則（含沒有 `protocol.md`）視為已有提案。
 
 排序鍵（依序比較）：
 
-1. `studyType.value == "review"` 者在前。
+1. 回顧類在前：`articleType.value` 為 `敘述性回顧`、`系統性回顧`、`統合分析`、`範疇回顧` 之一；卡片沒有 `articleType` 時退回 `studyType.value == "review"`。
 2. 本批引用次數多者在前：`references.csv` 中對應到本批論文（`inCorpus`）那一列的被引用次數；對不到則為 0。
-3. `proposalRelation` 中 `relation` 為 `衝突` 或 `已有人做過` 的項目數多者在前。
+3. 依模式：
+   - 已有提案：`proposalRelation` 中 `relation` 為 `衝突` 或 `已有人做過` 的項目數多者在前。
+   - 無提案：`research-gaps.md` 中該篇被引用的次數多者在前（計數 `[<key>, p.` 出現次數）；檔案不存在則為 0。
 4. `key` 字母順序。
 
 沒有 `card.json` 的篇（萃取例外）列在最後，理由寫「卡片未完成」。
@@ -73,24 +79,24 @@ exit 1 → 對同一個 summarizer 用 SendMessage 附上失敗輸出修一輪 �
 | 1 | <title> | review；被本批 3 篇引用 | [摘要](cards/<key>/summary.md)・[卡片](cards/<key>/card.md) |
 ```
 
-理由由排序鍵產生，只列非零／成立的訊號，以「；」連接；全不成立寫「無特殊訊號」。摘要不存在時只附卡片連結。
+理由由排序鍵產生，只列非零／成立的訊號，以「；」連接；全不成立寫「無特殊訊號」。訊號文字：`回顧類`、`被本批 <n> 篇引用`、`與提案衝突或已有人做過 <n> 項`（已有提案）、`研究空白引用 <n> 次`（無提案）。摘要不存在時只附卡片連結。
 
 ## 流程與 skill 改動（用 `skill-creator`）
 
 - `lit-extract/SKILL.md`：每篇第 2 節流程末加摘要與 `summary_check.py`；`progress.md` 每篇一行加「摘要 <通過|例外>」。
 - 新增 `lit-extract/summarizer.md`。
-- `lit-refs/SKILL.md`：第 4 節收尾加 `reading_order.py`。
-- `lit-gaps/SKILL.md`：停 2 呈現的檔案位置加 `reading-order.md`，並加一句「建議從 `reading-order.md` 開始讀」。
+- `lit-gaps/SKILL.md`：兩種模式在停 2 呈現前執行 `reading_order.py`（已有提案：第 2 節結束後；無提案：第 4 節結束後）；停 2 呈現的檔案位置加 `reading-order.md`，並加一句「建議從 `reading-order.md` 開始讀」。
 
 ## 測試（先紅後綠）
 
 - `test_summary_check.py`：全部合格 exit 0；某句無標記；標記欄位不存在；編號超出範圍；`[studyType]` 不帶編號合法；缺限制塊 exit 1；限制欄位為空時不要求；研究設計塊以 `designNotes` 滿足；`custom.<名稱>#n` 解析。
-- `test_reading_order.py`：review 排最前；本批被引用次數排序；衝突／已有人做過數排序；平手依 key；缺 `card.json` 排最後；理由字串只列成立訊號；無訊號寫「無特殊訊號」；無 `summary.md` 只附卡片連結。
+- `test_reading_order.py`：回顧類（articleType 四種）排最前；無 articleType 時退回 studyType；本批被引用次數排序；已有提案依衝突／已有人做過數排序；無提案依研究空白引用次數排序；無提案但缺 `research-gaps.md` 時該訊號為 0；平手依 key；缺 `card.json` 排最後；理由字串只列成立訊號；無訊號寫「無特殊訊號」；無 `summary.md` 只附卡片連結。
+- `test_summary_check.py` 另加：`[articleType]` 與 `[topics#n]` 標記合法。
 
 ## 要改的檔案
 
 - 新增：`scripts/summary_check.py`、`scripts/reading_order.py`、對應測試、`lit-extract/summarizer.md`。
-- 修改：`lit-extract/SKILL.md`、`lit-refs/SKILL.md`、`lit-gaps/SKILL.md`。
+- 修改：`lit-extract/SKILL.md`、`lit-gaps/SKILL.md`。
 
 ## 成本
 

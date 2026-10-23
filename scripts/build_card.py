@@ -1,17 +1,21 @@
-"""把甲的卡片（a.json）套上 judge 的裁決（judge.json），合成最終卡片 card.json 與 card.md。
+"""把甲的卡片（a.json）套上 judge 的裁決（judge.json）與 auditor 的補漏（audit.json），合成最終卡片 card.json 與 card.md。
 
 用法：uv run scripts/build_card.py reviews/<slug>/cards/<key>
 diff.json 列出的不一致欄位，judge 判不出來或沒裁決的，記進 pending；
+auditor 補到卡片沒有的欄位、或對已有的研究類型提出補充，也記進 pending（研究類型只能有一個，要人看）；
 引文空白、頁碼不對、引文含雙引號或換行的，記進 missingEvidence。兩者都會在 card.md 標 ⚠。
+補漏項目帶 source=audit，card.md 標「（補漏）」，讓人知道哪些是第二輪才找到的。
 """
 import json
 import sys
 from pathlib import Path
 
-from cardschema import NARRATIVE, STRUCTURED, field_items
+from cardschema import DUAL_NARRATIVE, NARRATIVE, STRUCTURED, field_items
 
 NOT_MENTIONED = "- 原文未提及"
 FORBIDDEN_IN_QUOTE = ('"', "“", "”", "\n")
+STRUCTURED_FIELDS = {field for field, _, _ in STRUCTURED}
+AUDIT_MARK = "（補漏）"
 
 
 def main(argv=None):
@@ -20,13 +24,15 @@ def main(argv=None):
     card = _load(card_dir / "a.json")
     diff = _load(card_dir / "diff.json", {"disagreements": []})
     judge = _load(card_dir / "judge.json", {"decisions": []})
+    audit = _load(card_dir / "audit.json", {})
 
     card["pending"] = _apply_judge(card, diff, judge)
+    card["auditAdded"] = _apply_audit(card, audit, card["pending"])
     card["missingEvidence"] = _missing_evidence(card)
 
     (card_dir / "card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (card_dir / "card.md").write_text(render(card), encoding="utf-8")
-    print(f"{card['key']}: 待裁決 {len(card['pending'])}、缺引文 {len(card['missingEvidence'])}")
+    print(f"{card['key']}: 待裁決 {len(card['pending'])}、缺引文 {len(card['missingEvidence'])}、補漏 {card['auditAdded']}")
     return 0
 
 
@@ -83,10 +89,43 @@ def _apply_judge(card, diff, judge):
         if decision is None:
             pending.append({"field": field, "reason": "judge 沒有裁決這個欄位"})
         elif decision.get("status") == "resolved":
-            card["structured"][field] = decision["value"]
+            target = "structured" if field in STRUCTURED_FIELDS else "narrative"
+            card.setdefault(target, {})[field] = decision["value"]
         else:
             pending.append({"field": field, "reason": decision.get("reason", "judge 判不出來")})
     return pending
+
+
+def _apply_audit(card, audit, pending):
+    """把 auditor 補的項目附上 source=audit 接到對應欄位尾端，回傳補了幾項。"""
+    added = 0
+    for field, items in (audit.get("additions") or {}).items():
+        items = [dict(item, source="audit") for item in items]
+        structured = card.setdefault("structured", {})
+        narrative = card.setdefault("narrative", {})
+        if field == "studyType":
+            if structured.get("studyType") or not items:
+                pending.append({"field": field, "reason": "auditor 對研究類型提出補充；研究類型只能有一個，請本人確認"})
+                continue
+            structured["studyType"] = items[0]
+            added += 1
+            continue
+        if field.startswith("custom."):
+            container, name = narrative.setdefault("custom", {}), field[len("custom."):]
+        elif field in STRUCTURED_FIELDS:
+            container, name = structured, field
+        elif field in DUAL_NARRATIVE:
+            container, name = narrative, field
+        else:
+            pending.append({"field": field, "reason": "auditor 補了卡片沒有的欄位"})
+            continue
+        container[name] = (container.get(name) or []) + items
+        added += len(items)
+    return added
+
+
+def _audit_mark(item):
+    return AUDIT_MARK if item.get("source") == "audit" else ""
 
 
 def _missing_evidence(card):
@@ -134,7 +173,7 @@ def _section(lines, heading, key, items, label):
     if not items:
         lines.append(NOT_MENTIONED)
         return
-    lines += [f"- {item.get(label, '')} {_cite(key, item)}" for item in items]
+    lines += [f"- {item.get(label, '')} {_cite(key, item)}{_audit_mark(item)}" for item in items]
 
 
 def _structure_table(lines, key, rows):
@@ -159,6 +198,7 @@ def _proposal_relation(lines, key, items):
         line = f"- 【{item.get('relation', '')}】{item.get('text', '')} {_cite(key, item)}"
         if item.get("proposalQuote") and _usable_quote(item["proposalQuote"]):
             line += f'；提案："{item["proposalQuote"]}" [proposal]'
+        line += _audit_mark(item)
         lines.append(line)
 
 

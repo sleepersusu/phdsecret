@@ -107,3 +107,82 @@ def test_items_without_usable_evidence_are_flagged(tmp_path):
 
     flagged = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))["missingEvidence"]
     assert flagged == ["structured.methods[0]", "narrative.findings[0]"]
+
+
+def test_judge_resolution_of_narrative_field_writes_narrative(tmp_path):
+    write(tmp_path, "a.json", full_card())
+    write(tmp_path, "diff.json", {"disagreements": [{"field": "limitations", "kind": "narrative"}]})
+    write(tmp_path, "judge.json", {"decisions": [
+        {"field": "limitations", "status": "resolved", "value": [note("只在單一醫院", 9)], "reason": "乙抓到的限制屬實"}
+    ]})
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert [n["text"] for n in card["narrative"]["limitations"]] == ["只在單一醫院"]
+    assert "limitations" not in card["structured"]
+    assert card["pending"] == []
+
+
+def test_audit_additions_are_appended_with_source_and_marked(tmp_path):
+    write(tmp_path, "a.json", full_card())
+    write(tmp_path, "audit.json", {"additions": {
+        "limitations": [note("只在單一醫院", 9)],
+        "methods": [item("XGBoost", 5)],
+        "custom.Source of data": [note("回溯性資料", 3)],
+    }, "sectionReasons": []})
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    md = (tmp_path / "card.md").read_text(encoding="utf-8")
+    assert card["narrative"]["limitations"][0]["source"] == "audit"
+    assert [m["value"] for m in card["structured"]["methods"]] == ["Transformer", "XGBoost"]
+    assert card["narrative"]["custom"]["Source of data"][0]["source"] == "audit"
+    assert card["auditAdded"] == 3
+    assert '- 只在單一醫院 "evidence for 只在單一醫院" [smith2023, p.9]（補漏）' in md
+    assert '- XGBoost "we report XGBoost" [smith2023, p.5]（補漏）' in md
+    assert '- Transformer "we report Transformer" [smith2023, p.3]\n' in md
+
+
+def test_audit_addition_to_unknown_field_is_pending(tmp_path):
+    write(tmp_path, "a.json", full_card())
+    write(tmp_path, "audit.json", {"additions": {"funding": [note("NIH 資助", 12)]}})
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert card["auditAdded"] == 0
+    assert [p["field"] for p in card["pending"]] == ["funding"]
+
+
+def test_audit_addition_to_existing_study_type_is_pending(tmp_path):
+    write(tmp_path, "a.json", full_card())
+    write(tmp_path, "audit.json", {"additions": {"studyType": [item("review", 1)]}})
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert card["structured"]["studyType"]["value"] == "實證研究"
+    assert [p["field"] for p in card["pending"]] == ["studyType"]
+
+
+def test_audit_additions_are_checked_for_evidence(tmp_path):
+    write(tmp_path, "a.json", full_card())
+    write(tmp_path, "audit.json", {"additions": {"limitations": [{"text": "沒引文", "quote": "", "page": 9}]}})
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    assert card["missingEvidence"] == ["narrative.limitations[0]"]
+
+
+def test_without_audit_file_audit_added_is_zero(tmp_path):
+    write(tmp_path, "a.json", full_card())
+
+    build_card.main([str(tmp_path)])
+
+    card = json.loads((tmp_path / "card.json").read_text(encoding="utf-8"))
+    md = (tmp_path / "card.md").read_text(encoding="utf-8")
+    assert card["auditAdded"] == 0
+    assert "（補漏）" not in md

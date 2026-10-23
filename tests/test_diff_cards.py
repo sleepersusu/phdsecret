@@ -188,3 +188,39 @@ def test_topics_are_not_compared():
 
 def test_name_key_ignores_case_and_punctuation():
     assert diff_cards.name_key("MIMIC-IV") == diff_cards.name_key("mimic iv")
+
+
+def test_compare_with_fields_only_checks_those_fields():
+    a = structured(methods=[item("Transformer")], results=[item("AUROC 0.89")])
+    b = structured(methods=[item("LSTM")], results=[item("AUROC 0.70")])
+
+    assert [d["field"] for d in diff_cards.compare(a, b, fields={"methods"})] == ["methods"]
+
+
+def test_main_fields_proposal_relation_ignores_other_one_sided_fields(tmp_path):
+    relation = [note("同資料集", "using adult ICU stays from MIMIC-IV", relation="支持", proposalQuote="We will use MIMIC-IV")]
+    a = {"key": "k", "structured": structured(), "narrative": narrative(proposalRelation=relation)}
+    b = {"key": "k", "narrative": {"proposalRelation": relation}}
+    (tmp_path / "a.json").write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "b.json").write_text(json.dumps(b, ensure_ascii=False), encoding="utf-8")
+
+    code = diff_cards.main([str(tmp_path), "--fields", "proposalRelation"])
+
+    written = json.loads((tmp_path / "diff.json").read_text(encoding="utf-8"))
+    assert code == 0
+    assert written["disagreements"] == []
+
+
+def test_main_fields_reports_only_requested_disagreement(tmp_path):
+    quote = "using adult ICU stays from MIMIC-IV"
+    a = {"key": "k", "structured": structured(), "narrative": narrative(
+        proposalRelation=[note("同資料集", quote, relation="支持", proposalQuote="We will use MIMIC-IV")])}
+    b = {"key": "k", "narrative": {"proposalRelation": [
+        note("做過了", quote, relation="已有人做過", proposalQuote="We will use MIMIC-IV")]}}
+    (tmp_path / "a.json").write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "b.json").write_text(json.dumps(b, ensure_ascii=False), encoding="utf-8")
+
+    diff_cards.main([str(tmp_path), "--fields", "proposalRelation"])
+
+    written = json.loads((tmp_path / "diff.json").read_text(encoding="utf-8"))
+    assert [d["field"] for d in written["disagreements"]] == ["proposalRelation"]

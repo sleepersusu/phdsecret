@@ -1,9 +1,11 @@
 """比對兩個萃取者各自寫的卡片（a.json、b.json），列出不一致的欄位交給 judge。
 
-用法：uv run scripts/diff_cards.py reviews/<slug>/cards/<key>
+用法：uv run scripts/diff_cards.py reviews/<slug>/cards/<key> [--fields 欄位1,欄位2]
 寫出 diff.json。寧可多報：誤報只多花一次 judge，漏報就是卡片錯了沒人發現。
 結構化欄位比值；敘述欄位是自由文字比不了字面，改以引文位置判斷是不是同一項。
+--fields 只比對列出的欄位，沿用舊卡片時只重做 proposalRelation 用得到；其餘欄位只出現在一邊也不報。
 """
+import argparse
 import json
 import re
 import sys
@@ -19,10 +21,12 @@ THOUSANDS = re.compile(r"^\d{1,3}(?:,\d{3})+(?:\.\d+)?$")
 MIN_SHARED_CHARS = 25
 
 
-def compare(a, b):
+def compare(a, b, fields=None):
     """回傳不一致清單 [{field, a, b, detail}]；a、b 是兩張卡片的 structured。"""
     disagreements = []
     for field, kind, _ in STRUCTURED:
+        if fields is not None and field not in fields:
+            continue
         if (field in a) != (field in b):
             detail = "只有一邊有這個欄位"
         elif field not in a:
@@ -39,10 +43,12 @@ def compare(a, b):
     return disagreements
 
 
-def compare_narrative(a, b):
+def compare_narrative(a, b, fields=None):
     """回傳敘述欄位的不一致清單 [{field, kind, onlyA, onlyB, detail}]；a、b 是兩張卡片的 narrative。"""
     disagreements = []
     for field in DUAL_NARRATIVE:
+        if fields is not None and field not in fields:
+            continue
         if field not in a and field not in b:
             continue
         if (field in a) != (field in b):
@@ -57,8 +63,9 @@ def compare_narrative(a, b):
 
 
 def main(argv=None):
-    argv = sys.argv[1:] if argv is None else argv
-    card_dir = Path(argv[0])
+    args = _parse_args(sys.argv[1:] if argv is None else argv)
+    card_dir = Path(args.card_dir)
+    fields = set(args.fields.split(",")) if args.fields else None
     a_path, b_path = card_dir / "a.json", card_dir / "b.json"
     if not a_path.exists() or not b_path.exists():
         print(f"{card_dir} 要同時有 a.json 與 b.json", file=sys.stderr)
@@ -66,13 +73,20 @@ def main(argv=None):
 
     a = json.loads(a_path.read_text(encoding="utf-8"))
     b = json.loads(b_path.read_text(encoding="utf-8"))
-    disagreements = compare(a.get("structured", {}), b.get("structured", {}))
-    disagreements += compare_narrative(a.get("narrative", {}), b.get("narrative", {}))
+    disagreements = compare(a.get("structured", {}), b.get("structured", {}), fields)
+    disagreements += compare_narrative(a.get("narrative", {}), b.get("narrative", {}), fields)
 
     result = {"key": a.get("key"), "disagreements": disagreements}
     (card_dir / "diff.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"{a.get('key')}: {len(disagreements)} 個欄位不一致" + "".join(f"\n- {d['field']}：{d['detail']}" for d in disagreements))
     return 0
+
+
+def _parse_args(argv):
+    parser = argparse.ArgumentParser(description="比對甲乙兩份卡片，列出不一致的欄位")
+    parser.add_argument("card_dir")
+    parser.add_argument("--fields", help="只比對這些欄位，逗號分隔（例：proposalRelation）")
+    return parser.parse_args(argv)
 
 
 def _unmatched(a_items, b_items, same_relation):

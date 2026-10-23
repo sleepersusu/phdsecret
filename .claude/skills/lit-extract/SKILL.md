@@ -1,6 +1,6 @@
 ---
 name: lit-extract
-description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 各自萃取（甲寫整張卡片，乙寫結構化與敘述欄位），腳本比對不一致才派 judge，合成第一版卡片後做章節涵蓋檢查、派 auditor 逐章節補漏，再逐則核對引文，最後產出比較矩陣，接著自動進入 lit-refs。reviews/<slug>/state.json 的 stage 是 auto:extract，或使用者說「開始萃取」「讀卡片」時使用。
+description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 各自萃取（甲寫整張卡片，乙寫結構化與敘述欄位），腳本比對不一致才派 judge，合成第一版卡片後做章節涵蓋檢查、派 auditor 逐章節補漏，再逐則核對引文，每篇另寫一段精簡摘要（summary_check 核對來源標記），最後產出比較矩陣，接著自動進入 lit-refs。reviews/<slug>/state.json 的 stage 是 auto:extract，或使用者說「開始萃取」「讀卡片」時使用。
 ---
 
 # lit-extract（萃取）

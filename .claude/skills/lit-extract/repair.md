@@ -17,7 +17,11 @@
 - 引文有改寫或抄錯 → 換成原文逐字的那一段。
 - 原文找不到能支持這一項的句子 → 刪掉這一項。不要硬找一句意思接近的。
 
-項目在哪個檔就改哪個檔：結構化欄位若在 `judge.json` 有裁決，改 `judge.json` 裡的 `value`；其餘改 `a.json`。
+`card.json` 是 `build_card.py` 用 `a.json`、`judge.json`、`audit.json` 重建的，只改 `card.md` 或 `card.json` 會在下次重建時被蓋掉。項目來自哪個檔就改哪個檔：
+
+- 標了（補漏）（`source: audit`）的項目 → 改 `audit.json` 的 `additions.<欄位>`（含 `custom.<名稱>`）。若這一項只是重複卡片已有的項目 → 直接從 `audit.json` 刪掉。
+- 欄位（結構化或敘述）在 `judge.json` 有 `resolved` 裁決 → 改 `judge.json` 裡的 `value`。
+- 其餘 → 改 `a.json`。
 
 ## 回報
 

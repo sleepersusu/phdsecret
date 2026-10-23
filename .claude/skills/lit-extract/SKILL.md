@@ -1,6 +1,6 @@
 ---
 name: lit-extract
-description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 各自萃取結構化欄位、一個寫整張卡片，腳本比對不一致才派 judge，合成卡片後逐則核對引文，最後產出比較矩陣，接著自動進入 lit-refs。reviews/<slug>/state.json 的 stage 是 auto:extract，或使用者說「開始萃取」「讀卡片」時使用。
+description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 各自萃取（甲寫整張卡片，乙寫結構化與敘述欄位），腳本比對不一致才派 judge，合成第一版卡片後做章節涵蓋檢查、派 auditor 逐章節補漏，再逐則核對引文，最後產出比較矩陣，接著自動進入 lit-refs。reviews/<slug>/state.json 的 stage 是 auto:extract，或使用者說「開始萃取」「讀卡片」時使用。
 ---
 
 # lit-extract（萃取）
@@ -15,7 +15,7 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 
 1. 讀 `reviews/<slug>/state.json`、`progress.md`、`protocol.md`、`papers.json`。`protocol.md` 的「執行設定」寫了甲乙用哪個模型、一次處理幾篇。
 2. `uv run scripts/extract_text.py reviews/<slug> --proposal <protocol.md 記的提案檔>`。
-3. 找出還沒完成的篇：`papers.json` 裡的每篇，`cards/<key>/card.md` 不存在，或 `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md` 沒過、而且 `progress.md` 沒記成例外的。已完成的不重做。
+3. 找出還沒完成的篇：`papers.json` 裡的每篇，只有 `progress.md` 已有該 `<key>` 的每篇一行（第 2 節最後才寫），或已記成例外，才算完成；其餘都要重做。不能用 `card.md` 是否存在判斷，因為第 2 節第 3 步就會產出第一版 `card.md`，那時 auditor 還沒跑。重做前先刪掉 `cards/<key>/` 裡所有產生的檔案：`a.json`、`b.json`、`diff.json`、`judge.json`、`audit.json`、`coverage.json`、`card.json`、`card.md`，讓甲乙從頭來，避免舊檔被併進新結果。這些是流水線的產出，不是本人的檔案；不碰 `pdfs/` 與 `text/`。
 
 ## 2. 每篇的流程
 
@@ -30,10 +30,10 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 3. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`（第一版卡片）。
 4. `uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`。這一步 exit 1 是正常的，只是產出 `coverage.json` 給 auditor。
 5. 派 auditor subagent（`model` 用甲模型）：「讀 `.claude/skills/lit-extract/auditor.md` 照做。slug：`<slug>`，key：`<key>`。」回 `BLOCKED` → 記成例外，跳過第 6、7 步。
-6. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`（併入補漏）。
-7. `uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`。仍 exit 1 → 記成例外，列出未涵蓋的節；不重派 auditor。
+6. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`（併入補漏）。失敗（例如 `audit.json` 格式錯誤）→ 記成例外（auditor 產出無法併入），刪掉 `audit.json`，重跑 build_card 以第一版卡片繼續第 7、8 步。
+7. `uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`。仍 exit 1 → 記成例外，列出未涵蓋的節；不重派 auditor。若輸出是「沒有章節拆解」，例外寫「沒有章節拆解，無法檢查涵蓋」，不要寫成未涵蓋幾節。
 8. `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`。
-9. 第 8 步有失敗、或 `card.json` 的 `missingEvidence` 不是空的 → 派一個 subagent 修，prompt 附上失敗輸出與 `missingEvidence`：「讀 `.claude/skills/lit-extract/repair.md` 照做。slug：`<slug>`，key：`<key>`。失敗清單：…」。修完重跑第 6、8 步。**只修一輪**，還是不過就記成例外。
+9. 第 8 步有失敗、或 `card.json` 的 `missingEvidence` 不是空的 → 派一個 subagent 修，prompt 附上失敗輸出與 `missingEvidence`：「讀 `.claude/skills/lit-extract/repair.md` 照做。slug：`<slug>`，key：`<key>`。失敗清單：…」。修完重跑第 6、7、8 步。**只修一輪**，還是不過就記成例外。
 
 每篇做完，在 `progress.md` 追加一行：`<key>：不一致 <n> 欄（judge 解決 <n>、待裁決 <n>）、補漏 <n> 項、無項目章節 <n> 節、未涵蓋 <n> 節、引文 <通過數>/<總數>（寬鬆 <n>）、修 <0 或 1> 輪`。補漏數取 `card.json` 的 `auditAdded`；無項目章節與未涵蓋數取 `coverage.json`。
 

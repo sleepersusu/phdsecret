@@ -18,11 +18,11 @@
 
 - 結構化：`dataSources`、`sampleSize`、`methods`、`results`（`studyType` 只有一個，不要補）。
 - 敘述：`researchQuestion`、`designNotes`、`findings`、`contributions`、`limitations`、`proposalRelation`。
-- `protocol.md` 的自訂欄位與加掛清單（欄位名寫成 `custom.<名稱>`）。
+- `protocol.md` 的自訂欄位與加掛清單（欄位名寫成 `custom.<名稱>`，`<名稱>` 照 `protocol.md` 一字不差）。
 
 卡片已有、只是換句話說的，不算漏；不要重複。
 
-`coverage.json` 裡 `items` 為 0 的每一節，必須二擇一：補出項目，或在 `sectionReasons` 寫一句理由說明這節為什麼沒有該收的內容。不得留白。
+`coverage.json` 裡 `items` 為 0 的每一節，必須二擇一：補出項目，或在 `sectionReasons` 寫一句理由說明這節為什麼沒有該收的內容。不得留白。已經有項目的章節不需要理由，`sectionReasons` 只放 `items` 為 0 的章節。
 
 ## 寫
 

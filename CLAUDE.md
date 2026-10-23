@@ -18,6 +18,11 @@
 | 停 2 看缺口 | `stop2` | `/lit-gaps` 的最後一步 | 本人在場 |
 | 撰寫 | `draft` | `/lit-draft` | 本人在場 |
 
+停 1 依 `proposal/` 有沒有提案檔決定模式，寫進 `protocol.md`：
+
+- **已有提案**：照上表，對照提案段寫缺口清單。
+- **無提案**：萃取不寫「跟提案的關係」；對照提案段改為研究空白整理；停 2 由 agent 提 2～3 個設計方向、本人選定；撰寫段寫第一版提案。放進 `proposal/` 後，下一批就走「已有提案」。
+
 停 1 點頭後，萃取 → 參考文獻合併 → 對照提案一路自動跑完，中途不問本人。例外（PDF 讀不出來、judge 判不出來、修過一輪仍核對不過）記進 `progress.md`，到停 2 一次呈現。
 
 主控 session 只派工、跑腳本、看結果；讀全文、寫卡片、找缺口都交給 subagent，主控的上下文才撐得住幾十篇。
@@ -66,6 +71,7 @@ context 隨時可能被壓縮，沒寫進檔案的進度就沒了。做完一步
 - `CONTEXT.md`：名詞表，用 `domain-modeling` 維護。
 - `docs/adr/`：難以回頭、又有取捨的決定，用 `domain-modeling` 寫。
 - `reviews/<slug>/` 已有 `state.json` → 先讀它和 `progress.md`，從中斷處接續，不重做已完成的部分。
+- `library/tags.json`：跨批次的領域標籤字典，本人可直接編輯（改過的類別設 `"source": "user"`，agent 不會再動它）；單篇修改寫 `reviews/<slug>/tag-overrides.json`。
 
 ## 講到論文內容的每一句話
 

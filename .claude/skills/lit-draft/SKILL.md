@@ -15,7 +15,7 @@ description: 流水線的撰寫段：依 doc-coauthoring 的流程跟本人一�
 
 一次問一題、附建議答案，已經知道的跳過：
 
-1. 這次寫什麼文件、哪幾節（例：提案的 Background、文獻回顧章）。
+1. 這次寫什麼文件、哪幾節（例：提案的 Background、文獻回顧章）。`protocol.md` 的模式是「無提案」時，預設文件是**第一版提案**，草稿放 `drafts/proposal-v1/`；章節依 `protocol.md` 記的提案範本，沒有範本就用：背景、文獻回顧、研究問題、研究方法、預期貢獻、時程。
 2. 讀者是誰（指導教授、審查委員、期刊）。
 3. 語言、字數、引用格式。
 4. 學校或指導教授對 AI 使用的規範（`protocol.md` 有記就沿用）。
@@ -30,8 +30,9 @@ description: 流水線的撰寫段：依 doc-coauthoring 的流程跟本人一�
   2. 貢獻聲明：本人的研究跟這批文獻差在哪裡。
   3. 文獻的取捨與批判：為什麼採信這篇、不採那篇。
   4. 討論裡的詮釋：結果代表什麼。
+  5. 無提案模式另加：研究問題、研究方法。這兩段是本人的研究設計判斷。
 
-本人段落只給素材，不給成稿：相關卡片與引文、`proposal-gaps.md` 裡相關的條目、這段要回答的 2～3 個問題。
+本人段落只給素材，不給成稿：相關卡片與引文、`proposal-gaps.md`（已有提案）或 `research-gaps.md` 與 `chosen-direction.md`（無提案）裡相關的條目、這段要回答的 2～3 個問題。
 
 把 outline 給本人看，確認分類後才開始起草。
 
@@ -59,4 +60,4 @@ description: 流水線的撰寫段：依 doc-coauthoring 的流程跟本人一�
 
 1. `progress.md` 追加：寫了哪幾節、字數、引文核對結果、peer-review 主要意見與處理方式。
 2. `state.json` 的 `stage` 設為 `draft`，`note` 寫目前寫到哪一節。
-3. 告訴本人交稿前要做的事：刪掉 `<!-- -->` 證據註解；用 `papers.bib` 產生參考文獻列表（例如 `pandoc --citeproc --bibliography reviews/<slug>/papers.bib`）；本人段落由本人完成；依學校規範決定是否揭露 AI 的使用。
+3. 告訴本人交稿前要做的事：刪掉 `<!-- -->` 證據註解；用 `papers.bib` 產生參考文獻列表（例如 `pandoc --citeproc --bibliography reviews/<slug>/papers.bib`）；本人段落由本人完成；依學校規範決定是否揭露 AI 的使用。無提案模式：提醒本人把完成的提案放進 `proposal/`，下一批論文就會自動走「已有提案」模式。

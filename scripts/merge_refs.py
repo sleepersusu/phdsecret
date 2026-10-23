@@ -14,11 +14,10 @@ import sys
 from difflib import SequenceMatcher
 from pathlib import Path
 
+import paperid
 import quote_check
 
 NON_WORD = re.compile(r"[\W_]+")
-DOI_PREFIX = re.compile(r"^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)", re.IGNORECASE)
-ARXIV_ID = re.compile(r"^arxiv:\s*", re.IGNORECASE)
 CSV_FIELDS = ["refId", "title", "firstAuthor", "year", "doi", "citedByCount", "citedBy", "inCorpus", "uncertain", "raw"]
 
 
@@ -83,7 +82,7 @@ def _load_entries(review, ref_paths):
 def _group(entries, fuzzy):
     groups, by_doi, by_title = [], {}, {}
     for key, ref in entries:
-        doi = _doi(ref.get("doi"))
+        doi = paperid.normalize_doi(ref.get("doi"))
         title_key = _title_key(ref.get("title"))
         year = str(ref.get("year") or "")
 
@@ -150,27 +149,12 @@ def _rows(groups, papers, fuzzy):
 
 def _corpus_key(group, papers, fuzzy):
     for paper in papers:
-        if group["doi"] and group["doi"] in _paper_dois(paper.get("id")):
+        if group["doi"] and group["doi"] in paperid.doi_aliases(paper.get("id")):
             return paper["key"]
         paper_title = _title_key(paper.get("title"))
         if paper_title and group["titleKey"] and _similar(paper_title, group["titleKey"], fuzzy):
             return paper["key"]
     return ""
-
-
-def _paper_dois(paper_id):
-    """論文 id 可能是 DOI 或 arXiv ID；arXiv 的 DOI 是 10.48550/arxiv.<id>。"""
-    if not paper_id:
-        return set()
-    if ARXIV_ID.match(paper_id):
-        return {f"10.48550/arxiv.{ARXIV_ID.sub('', paper_id).lower()}"}
-    return {_doi(paper_id)}
-
-
-def _doi(value):
-    if not value:
-        return None
-    return DOI_PREFIX.sub("", value.strip()).rstrip(".").lower() or None
 
 
 def _title_key(title):

@@ -14,7 +14,7 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 ## 1. 準備
 
 1. 讀 `reviews/<slug>/state.json`、`progress.md`、`protocol.md`、`papers.json`。`protocol.md` 的「執行設定」寫了甲乙用哪個模型、一次處理幾篇。
-2. `uv run scripts/extract_text.py reviews/<slug> --proposal <protocol.md 記的提案檔>`。
+2. 讀 `protocol.md` 的「模式」。已有提案：`uv run scripts/extract_text.py reviews/<slug> --proposal <protocol.md 記的提案檔>`；無提案：`uv run scripts/extract_text.py reviews/<slug>`（不給 `--proposal`）。
 3. 找出還沒完成的篇：`papers.json` 裡的每篇，只有 `progress.md` 已有該 `<key>` 的每篇一行（第 2 節最後才寫），或已記成例外，才算完成；其餘都要重做。不能用 `card.md` 是否存在判斷，因為第 2 節第 3 步就會產出第一版 `card.md`，那時 auditor 還沒跑。重做前先刪掉 `cards/<key>/` 裡所有產生的檔案：`a.json`、`b.json`、`diff.json`、`judge.json`、`audit.json`、`coverage.json`、`card.json`、`card.md`，讓甲乙從頭來，避免舊檔被併進新結果。這些是流水線的產出，不是本人的檔案；不碰 `pdfs/` 與 `text/`。
 
 ## 2. 每篇的流程
@@ -39,7 +39,11 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 
 ## 3. 收尾
 
-1. `uv run scripts/matrix.py reviews/<slug>`。
-2. 對每張卡片再跑一次 `quote_check.py`，數字寫進 `progress.md`。
-3. 例外（BLOCKED、修過仍不過、待本人裁決的欄位、章節未涵蓋）整理成一段，追加到 `progress.md` 的「例外」小節。
-4. `state.json` 改成 `auto:refs`，`note` 寫「萃取完成，<n> 篇、例外 <n>」，接著執行 `/lit-refs`。
+1. 標籤歸併：
+   1. 派 tag-normalizer subagent（`model` 用乙模型）：「讀 `.claude/skills/lit-extract/tag-normalizer.md` 照做。slug：`<slug>`。」回 `BLOCKED` → 記成例外，跳過 2。
+   2. `uv run scripts/merge_tags.py reviews/<slug>`。被拒絕的提議會列在 `tag-merge-report.json`，到停 2 呈現，不重派。
+   3. `uv run scripts/apply_tags.py reviews/<slug>`。
+2. `uv run scripts/matrix.py reviews/<slug>`。
+3. 對每張卡片再跑一次 `quote_check.py`，數字寫進 `progress.md`。
+4. 例外（BLOCKED、修過仍不過、待本人裁決的欄位、章節未涵蓋）整理成一段，追加到 `progress.md` 的「例外」小節。
+5. `state.json` 改成 `auto:refs`，`note` 寫「萃取完成，<n> 篇、例外 <n>」，接著執行 `/lit-refs`。

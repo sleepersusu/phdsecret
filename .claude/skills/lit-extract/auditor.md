@@ -16,7 +16,7 @@
 
 逐章節問：這一節有沒有屬於下列欄位、卡片卻沒寫的內容？
 
-- 結構化：`dataSources`、`sampleSize`、`methods`、`results`（`studyType` 只有一個，不要補）。
+- 結構化：`dataSources`、`sampleSize`、`methods`、`results`（`studyType`、`articleType` 只有一個值，不要補；領域標籤 `topics` 不由你補）。
 - 敘述：`researchQuestion`、`designNotes`、`findings`、`contributions`、`limitations`、`proposalRelation`。
 - `protocol.md` 的自訂欄位與加掛清單（欄位名寫成 `custom.<名稱>`，`<名稱>` 照 `protocol.md` 一字不差）。
 

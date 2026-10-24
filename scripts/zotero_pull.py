@@ -4,9 +4,11 @@
 本機 API 唯讀、不需金鑰；Zotero 要開著，且「設定 → 進階」勾選允許其他應用程式通訊。
 資料夾的條目是平的清單：論文與它的 PDF 附件並列，附件以 parentItem 指回論文；
 附件的 links.enclosure.href 是 file:// 網址，直接指向 ~/Zotero/storage 的檔案（2026-10-24 以本人的 Zotero 7 驗證）。
-只複製不搬移，也不覆蓋 pdfs/ 已有的檔案；沒有 PDF 的論文、沒有書目資料的單獨 PDF 列出來讓本人處理。
+只複製不搬移，也不覆蓋 pdfs/ 已有的檔案（以獨占模式 "xb" 建立，撞名就記入 skipped）；
+同一篇有多個 PDF 附件時取 API 順序中第一個存在的檔案；沒有 PDF 的論文、沒有書目資料的單獨 PDF 列出來讓本人處理。
 """
 import argparse
+import http.client
 import json
 import re
 import shutil
@@ -34,7 +36,7 @@ def fetch_json(url):
     try:
         with urllib.request.urlopen(url, timeout=10) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, ConnectionError, TimeoutError) as error:
+    except (urllib.error.URLError, ConnectionError, TimeoutError, http.client.HTTPException, ValueError) as error:
         raise ZoteroUnavailable(str(error)) from error
 
 
@@ -75,7 +77,7 @@ def pull(items, pdf_dir):
             if data.get("contentType") != "application/pdf":
                 continue
             if data.get("parentItem"):
-                attachments.setdefault(data["parentItem"], _file_path(item))
+                attachments.setdefault(data["parentItem"], []).append(_file_path(item))
             else:
                 loose.append({"title": data.get("title") or data.get("filename") or "", "zoteroKey": item["key"]})
         elif data.get("itemType") != "note":
@@ -86,19 +88,21 @@ def pull(items, pdf_dir):
     for item in sorted(papers, key=lambda i: (base_key(i["data"]), (i["data"].get("title") or "").casefold())):
         data = item["data"]
         title, pid = data.get("title") or "", _paper_id(data)
-        source = attachments.get(item["key"])
-        if source is None or not source.exists():
+        source = next((p for p in attachments.get(item["key"], []) if p is not None and p.exists()), None)
+        if source is None:
             result["noPdf"].append({"title": title, "id": pid, "zoteroKey": item["key"]})
             continue
         base = base_key(data)
         count = used.get(base, 0)
         used[base] = count + 1
-        key = base if count == 0 else base + "abcdefghijklmnopqrstuvwxyz"[count - 1]
+        key = base + _suffix(count)
         target = pdf_dir / f"{key}.pdf"
-        if target.exists():
+        try:
+            with open(source, "rb") as src, open(target, "xb") as dst:
+                shutil.copyfileobj(src, dst)
+        except FileExistsError:
             result["skipped"].append({"key": key, "title": title})
             continue
-        shutil.copyfile(source, target)
         result["pulled"].append({"key": key, "id": pid, "title": title, "zoteroKey": item["key"]})
     return result
 
@@ -137,6 +141,15 @@ def _paper_id(data):
         return cid
     match = EXTRA_ID.search(data.get("extra") or "")
     return canonical_id(match.group(0)) if match else None
+
+
+def _suffix(count):
+    """第 0 篇沒有後綴，之後依序 a…z、aa、ab…（26 進位，同名論文超過 26 篇也不會出錯）。"""
+    letters = ""
+    while count > 0:
+        count, rest = divmod(count - 1, 26)
+        letters = "abcdefghijklmnopqrstuvwxyz"[rest] + letters
+    return letters
 
 
 def _ascii(text):

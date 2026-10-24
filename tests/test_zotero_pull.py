@@ -1,6 +1,9 @@
+import http.client
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import zotero_pull  # noqa: E402
@@ -132,3 +135,79 @@ def test_main_writes_zotero_pull_json(tmp_path):
     assert code == 0
     assert result["pulled"][0]["key"] == "page2021"
     assert (review / "pdfs" / "page2021.pdf").exists()
+
+
+def test_same_key_suffix_goes_past_z(tmp_path):
+    items = []
+    for i in range(29):
+        items += [paper(f"P{i}", f"Title {i:02d}", doi=f"10.1/{i}"), pdf(f"A{i}", f"P{i}", make_pdf(tmp_path, f"{i}.pdf"))]
+
+    result = zotero_pull.pull(items, tmp_path / "pdfs")
+
+    keys = [p["key"] for p in result["pulled"]]
+    assert len(keys) == len(set(keys)) == 29
+    assert {"page2021", "page2021a", "page2021z", "page2021aa", "page2021ab"} <= set(keys)
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_fetch_json_non_json_response_is_unavailable(monkeypatch):
+    monkeypatch.setattr(zotero_pull.urllib.request, "urlopen", lambda url, timeout=None: FakeResponse(b"<html>not json"))
+
+    with pytest.raises(zotero_pull.ZoteroUnavailable):
+        zotero_pull.fetch_json(BASE)
+
+
+def test_fetch_json_undecodable_response_is_unavailable(monkeypatch):
+    monkeypatch.setattr(zotero_pull.urllib.request, "urlopen", lambda url, timeout=None: FakeResponse(b"\xff\xfe"))
+
+    with pytest.raises(zotero_pull.ZoteroUnavailable):
+        zotero_pull.fetch_json(BASE)
+
+
+def test_fetch_json_http_exception_is_unavailable(monkeypatch):
+    def broken(url, timeout=None):
+        raise http.client.HTTPException("bad status line")
+
+    monkeypatch.setattr(zotero_pull.urllib.request, "urlopen", broken)
+
+    with pytest.raises(zotero_pull.ZoteroUnavailable):
+        zotero_pull.fetch_json(BASE)
+
+
+def test_multiple_pdf_attachments_use_first_existing(tmp_path):
+    existing = make_pdf(tmp_path, "good.pdf")
+    missing = tmp_path / "storage" / "gone.pdf"
+    items = [paper("P1", "Alpha", doi="10.1/a"), pdf("A1", "P1", missing), pdf("A2", "P1", existing)]
+
+    result = zotero_pull.pull(items, tmp_path / "pdfs")
+
+    assert [p["zoteroKey"] for p in result["pulled"]] == ["P1"]
+    assert (tmp_path / "pdfs" / "page2021.pdf").read_bytes() == existing.read_bytes()
+
+
+def test_existing_target_is_never_overwritten_even_if_check_is_bypassed(tmp_path, monkeypatch):
+    pdfs = tmp_path / "pdfs"
+    pdfs.mkdir()
+    (pdfs / "page2021.pdf").write_bytes(b"mine")
+    real_exists = Path.exists
+    monkeypatch.setattr(Path, "exists", lambda self: False if self.name == "page2021.pdf" else real_exists(self))
+    items = [paper("P1", "Alpha", doi="10.1/a"), pdf("A1", "P1", make_pdf(tmp_path, "a.pdf"))]
+
+    result = zotero_pull.pull(items, pdfs)
+
+    assert (pdfs / "page2021.pdf").read_bytes() == b"mine"
+    assert result["skipped"] == [{"key": "page2021", "title": "Alpha"}]
+    assert result["pulled"] == []

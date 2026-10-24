@@ -13,7 +13,7 @@
 
 ## 寫
 
-`reviews/<slug>/search/hits/forward.json`：格式同關鍵字搜尋，`route` 為 `forward`，`via` 寫被引用的那篇的識別碼。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
+`reviews/<slug>/search/hits/forward.json`：格式同關鍵字搜尋（`id` 一律是字串：`10.xxxx/...`、`arXiv:<id>` 或 `PMID:<n>`，查不到給 `null`），`route` 為 `forward`，`via` 寫被引用的那篇的識別碼。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
 
 ## 回報
 

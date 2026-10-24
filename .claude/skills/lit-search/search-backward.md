@@ -2,7 +2,7 @@
 
 ## 讀
 
-1. `library/references.csv`：跨批次合併的參考文獻。取 `citedByCount >= 2`（被兩篇以上不同論文引用）且 `inCorpus` 為空（還沒讀）的列。
+1. `library/references.csv`：跨批次合併的參考文獻。取 `citedByCount >= 2`（被兩篇以上不同論文引用）且 `inCorpus` 為空（還沒讀）的列；超過 100 列時只取 `citedByCount` 最高的前 100 列（同分者任取）。
 2. `reviews/<slug>/search/search-protocol.md`：年份與語言限制（不符的不收）。
 
 ## 做
@@ -13,7 +13,7 @@
 
 ## 寫
 
-`reviews/<slug>/search/hits/backward.json`：格式同關鍵字搜尋，`route` 為 `backward`，`via` 寫 `citedBy` 欄的內容。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
+`reviews/<slug>/search/hits/backward.json`：格式同關鍵字搜尋（`id` 一律是字串：`10.xxxx/...`、`arXiv:<id>` 或 `PMID:<n>`，查不到給 `null`），`route` 為 `backward`，`via` 寫 `citedBy` 欄的內容。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
 
 ## 回報
 

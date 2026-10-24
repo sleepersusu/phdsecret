@@ -17,7 +17,7 @@
 
 ## 寫
 
-`reviews/<slug>/search/hits/keyword.json`：`[{"id", "title", "year", "authors": [..], "abstract", "venue", "route": "keyword", "via": "<搜尋式>"}]`。識別碼查不到的 `id` 給 `null`，不要編。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
+`reviews/<slug>/search/hits/keyword.json`：`[{"id", "title", "year", "authors": [..], "abstract", "venue", "route": "keyword", "via": "<搜尋式>"}]`。`id` 一律是字串，只能是三種寫法之一：`10.xxxx/...`（DOI）、`arXiv:<id>`、`PMID:<n>`；查不到給 `null`，不要編。作者寫成「姓, 名」（例：`Page, Matthew J`），Zotero 匯入 RIS 時才分得出姓和名；只有團體作者時照原名寫。
 
 ## 回報
 

@@ -24,7 +24,7 @@ description: 流水線的停 1：開一個新的文獻 review（例：教授給�
 1. `uv run scripts/inventory.py reviews/<slug>` → 產出 `inventory.json` 並印出表格。
 2. 狀態不是「可讀」的檔案記成例外，第 4 步一次告訴本人。
 3. 已有提案：`uv run scripts/extract_text.py reviews/<slug> --proposal proposal/<提案檔>`；無提案：`uv run scripts/extract_text.py reviews/<slug>`。論文（與提案）的純文字放進 `text/`。提案格式不支援時，請本人另存成 .docx、.pdf 或 .md。
-4. 確認每篇的 id：盤點抓到的 DOI、arXiv ID 只是候選，前兩頁也可能出現別篇的 DOI。讀 `text/<key>.txt` 第一頁取得標題與作者，再查 `https://doi.org/<doi>` 或 `https://arxiv.org/abs/<id>`，標題相符才算確認；沒有候選就用標題查（有 `paper-lookup` 就用它）。確認不了的標「id 待確認」。有 `search/zotero-pull.json` 時，`pulled` 的 `id` 優先採用（仍讀第一頁比對標題）。
+4. 確認每篇的 id：盤點抓到的 DOI、arXiv ID 只是候選，前兩頁也可能出現別篇的 DOI。讀 `text/<key>.txt` 第一頁取得標題與作者，再查 `https://doi.org/<doi>` 或 `https://arxiv.org/abs/<id>`，標題相符才算確認；沒有候選就用標題查（有 `paper-lookup` 就用它）。確認不了的標「id 待確認」。有 `search/zotero-pull.json` 時，`pulled` 的 `id` 優先採用（仍讀第一頁比對標題）；`id` 為 null 時照原流程用第一頁標題查。
 5. 寫 `reviews/<slug>/papers.json`：`[{"key": "...", "id": "DOI 或 arXiv:xxxx.xxxxx", "title": "..."}]`，只收可讀的篇。寫完跑 `uv run scripts/library_lookup.py reviews/<slug>`，以前在別批讀過的篇會列進 `known.json`。
 6. 已有提案模式：讀 `text/proposal.txt`，列出章節標題，每節寫一句大意。無提案模式跳過。
 

@@ -107,3 +107,10 @@
 
 - 新增：`scripts/search_merge.py`、`scripts/screen_compare.py`、`scripts/zotero_pull.py`、對應測試、`.claude/skills/lit-search/*`。
 - 修改：`lit-protocol/SKILL.md`、`CLAUDE.md`。
+
+## 2026-10-24 更新（配合子專案 5、3）
+
+1. **模式**：停 0 定的研究問題即停 1 的研究方向；`proposal/` 沒有提案時，它同時是無提案模式的「研究興趣的大方向」。`lit-protocol` 讀 `search/search-protocol.md`，已答的研究方向、研究興趣不再問；模式仍依 `proposal/` 偵測並由本人確認。
+2. **文獻庫已存在（子專案 3）**：`search_merge.py` 的「已讀」比對 `library/index.json`；往回追讀 `library/references.csv`，其 `citedBy` 已是去重後的論文識別碼，`citedByCount >= 2` 代表被兩篇以上**不同論文**引用；往前追以 `library/index.json` 的正規識別碼查詢。
+3. **接進停 1**：`zotero_pull.py` 完成後，`lit-protocol` 盤點照常跑（`inventory.py`、`extract_text.py`、寫 `papers.json` 時優先用 `zotero-pull.json` 的 `id` 但仍比對標題），接著照子專案 3 跑 `library_lookup.py`。
+4. **Zotero 本機 API**：`zotero_pull.py` 的端點與附件路徑取法，以本人實際安裝的 Zotero 7 驗證後寫死；測試用模擬回應。

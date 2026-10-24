@@ -100,14 +100,19 @@ def pull(items, pdf_dir, previous=None):
             papers.append(item)
 
     carried = list(previous or [])
-    result = {"pulled": carried, "noPdf": [], "skipped": [], "noMetadata": loose}
+    result = {"pulled": carried, "noPdf": [], "skipped": [], "noMetadata": loose, "duplicates": []}
     done = {entry["zoteroKey"] for entry in carried}
     taken = {entry["key"] for entry in carried}
+    # 本人在 Zotero 刪掉再加回同一篇時，條目 key 會變，所以另以識別碼判斷「已經讀回過」，避免同一篇複製兩份
+    by_id = {entry["id"]: entry["key"] for entry in carried if entry.get("id")}
     for item in sorted(papers, key=lambda i: (base_key(i["data"]), (i["data"].get("title") or "").casefold())):
         if item["key"] in done:
             continue
         data = item["data"]
         title, pid = data.get("title") or "", _paper_id(data)
+        if pid and pid in by_id:
+            result["duplicates"].append({"title": title, "id": pid, "zoteroKey": item["key"], "sameAs": by_id[pid]})
+            continue
         source = next((p for p in attachments.get(item["key"], []) if p is not None and p.exists()), None)
         if source is None:
             result["noPdf"].append({"title": title, "id": pid, "zoteroKey": item["key"]})
@@ -126,6 +131,8 @@ def pull(items, pdf_dir, previous=None):
             result["skipped"].append({"key": key, "title": title})
             continue
         result["pulled"].append({"key": key, "id": pid, "title": title, "zoteroKey": item["key"]})
+        if pid:
+            by_id[pid] = key
     return result
 
 
@@ -150,7 +157,7 @@ def main(argv=None, fetch=fetch_json):
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"本次新複製 {len(result['pulled']) - len(previous)} 篇（累計 {len(result['pulled'])} 篇）；缺 PDF {len(result['noPdf'])} 篇；已存在未覆蓋 {len(result['skipped'])} 篇；"
-          f"沒有書目資料的 PDF {len(result['noMetadata'])} 個")
+          f"沒有書目資料的 PDF {len(result['noMetadata'])} 個；同一篇重複加入的 {len(result['duplicates'])} 篇（未再複製）")
     for entry in result["noMetadata"]:
         print(f"- 沒有書目資料：{entry['title']}（在 Zotero 對它按右鍵 →「擷取 PDF 的中繼資料」後重跑）")
     return 0

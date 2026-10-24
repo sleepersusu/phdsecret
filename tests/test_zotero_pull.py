@@ -246,6 +246,23 @@ def test_rerun_keeps_previous_keys_and_does_not_recopy(tmp_path):
     assert (review / "pdfs" / "smith2023a.pdf").read_bytes() == b"alpha-bytes"
 
 
+def test_readded_item_with_same_id_is_not_copied_again(tmp_path):
+    review = tmp_path / "reviews" / "demo"
+    args = [str(review), "--collection", "demo", "--base", BASE]
+    source = make_pdf(tmp_path, "prisma.pdf", b"prisma-bytes")
+
+    run1 = _collection_responses([paper("P1", "PRISMA", doi="10.1136/bmj.n71"), pdf("A1", "P1", source)])
+    assert zotero_pull.main(args, fetch=run1.__getitem__) == 0
+
+    readded = _collection_responses([paper("P9", "PRISMA", doi="10.1136/BMJ.n71"), pdf("A9", "P9", source)])
+    assert zotero_pull.main(args, fetch=readded.__getitem__) == 0
+
+    result = json.loads((review / "search" / "zotero-pull.json").read_text(encoding="utf-8"))
+    assert [p["key"] for p in result["pulled"]] == ["page2021"]
+    assert result["duplicates"] == [{"title": "PRISMA", "id": "10.1136/bmj.n71", "zoteroKey": "P9", "sameAs": "page2021"}]
+    assert sorted(p.name for p in (review / "pdfs").iterdir()) == ["page2021.pdf"]
+
+
 def test_collections_are_paginated():
     first = [{"key": f"X{i}", "data": {"name": f"c{i}"}, "meta": {}} for i in range(100)]
     second = [{"key": "C1", "data": {"name": "demo"}, "meta": {}}]

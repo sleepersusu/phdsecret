@@ -4,7 +4,8 @@
 本機 API 唯讀、不需金鑰；Zotero 要開著，且「設定 → 進階」勾選允許其他應用程式通訊。
 資料夾的條目是平的清單：論文與它的 PDF 附件並列，附件以 parentItem 指回論文；
 附件的 links.enclosure.href 是 file:// 網址，直接指向 ~/Zotero/storage 的檔案（2026-10-24 以本人的 Zotero 7 驗證）。
-只複製不搬移，也不覆蓋 pdfs/ 已有的檔案（以獨占模式 "xb" 建立，撞名就記入 skipped）；
+只複製不搬移，也不覆蓋 pdfs/ 已有的檔案（以獨占模式 "xb" 建立）。可重跑：上次 zotero-pull.json 的 pulled 原封保留
+（key 不變、不再複製），新的論文挑第一個沒被用過、檔案也不存在的後綴；真的撞名（FileExistsError）才記入 skipped；
 同一篇有多個 PDF 附件時取 API 順序中第一個存在的檔案；沒有 PDF 的論文、沒有書目資料的單獨 PDF 列出來讓本人處理。
 """
 import argparse
@@ -32,6 +33,12 @@ class ZoteroUnavailable(Exception):
     pass
 
 
+class DuplicateCollection(Exception):
+    def __init__(self, keys):
+        super().__init__(keys)
+        self.keys = keys
+
+
 def fetch_json(url):
     try:
         with urllib.request.urlopen(url, timeout=10) as response:
@@ -42,8 +49,17 @@ def fetch_json(url):
 
 def collection_items(base, name, fetch=fetch_json):
     """回傳 (資料夾 key, 條目清單)；找不到資料夾時回 (None, 現有資料夾名稱)。"""
-    collections = fetch(f"{base}/users/0/collections?limit={PAGE}")
-    match = next((c for c in collections if c["data"]["name"] == name), None)
+    collections, start = [], 0
+    while True:
+        page = fetch(f"{base}/users/0/collections?limit={PAGE}&start={start}")
+        collections += page
+        if len(page) < PAGE:
+            break
+        start += PAGE
+    matches = [c for c in collections if c["data"]["name"] == name]
+    if len(matches) > 1:
+        raise DuplicateCollection([c["key"] for c in matches])
+    match = matches[0] if matches else None
     if match is None:
         return None, [c["data"]["name"] for c in collections]
     items, start = [], 0
@@ -67,7 +83,7 @@ def base_key(data):
     return word + (year.group(0) if year else "nd")
 
 
-def pull(items, pdf_dir):
+def pull(items, pdf_dir, previous=None):
     pdf_dir = Path(pdf_dir)
     pdf_dir.mkdir(parents=True, exist_ok=True)
     attachments, loose, papers = {}, [], []
@@ -83,9 +99,13 @@ def pull(items, pdf_dir):
         elif data.get("itemType") != "note":
             papers.append(item)
 
-    result = {"pulled": [], "noPdf": [], "skipped": [], "noMetadata": loose}
-    used = {}
+    carried = list(previous or [])
+    result = {"pulled": carried, "noPdf": [], "skipped": [], "noMetadata": loose}
+    done = {entry["zoteroKey"] for entry in carried}
+    taken = {entry["key"] for entry in carried}
     for item in sorted(papers, key=lambda i: (base_key(i["data"]), (i["data"].get("title") or "").casefold())):
+        if item["key"] in done:
+            continue
         data = item["data"]
         title, pid = data.get("title") or "", _paper_id(data)
         source = next((p for p in attachments.get(item["key"], []) if p is not None and p.exists()), None)
@@ -93,9 +113,11 @@ def pull(items, pdf_dir):
             result["noPdf"].append({"title": title, "id": pid, "zoteroKey": item["key"]})
             continue
         base = base_key(data)
-        count = used.get(base, 0)
-        used[base] = count + 1
+        count = 0
+        while base + _suffix(count) in taken or (pdf_dir / f"{base + _suffix(count)}.pdf").exists():
+            count += 1
         key = base + _suffix(count)
+        taken.add(key)
         target = pdf_dir / f"{key}.pdf"
         try:
             with open(source, "rb") as src, open(target, "xb") as dst:
@@ -115,14 +137,18 @@ def main(argv=None, fetch=fetch_json):
     except ZoteroUnavailable:
         print(CONNECT_HINT, file=sys.stderr)
         return 1
+    except DuplicateCollection as error:
+        print(f"有多個同名資料夾「{args.collection}」（key：{'、'.join(error.keys)}），請在 Zotero 改名後重跑", file=sys.stderr)
+        return 1
     if key is None:
         print(f"找不到 Zotero 資料夾「{args.collection}」；現有：{'、'.join(items) or '（無）'}", file=sys.stderr)
         return 1
 
-    result = pull(items, review / "pdfs")
-    (review / "search").mkdir(parents=True, exist_ok=True)
-    (review / "search" / "zotero-pull.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n",
-                                                       encoding="utf-8")
+    record = review / "search" / "zotero-pull.json"
+    previous = json.loads(record.read_text(encoding="utf-8")).get("pulled", []) if record.exists() else []
+    result = pull(items, review / "pdfs", previous)
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"複製 {len(result['pulled'])} 篇；缺 PDF {len(result['noPdf'])} 篇；已存在未覆蓋 {len(result['skipped'])} 篇；"
           f"沒有書目資料的 PDF {len(result['noMetadata'])} 個")
     for entry in result["noMetadata"]:

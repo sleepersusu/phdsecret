@@ -57,17 +57,18 @@ def test_same_key_gets_letter_suffix(tmp_path):
     assert [p["key"] for p in result["pulled"]] == ["page2021", "page2021a"]
 
 
-def test_existing_pdf_is_not_overwritten(tmp_path):
+def test_unrelated_existing_pdf_makes_new_paper_take_next_suffix(tmp_path):
     pdfs = tmp_path / "pdfs"
     pdfs.mkdir()
     (pdfs / "page2021.pdf").write_bytes(b"mine")
-    items = [paper("P1", "Alpha", doi="10.1/a"), pdf("A1", "P1", make_pdf(tmp_path, "a.pdf"))]
+    items = [paper("P1", "Alpha", doi="10.1/a"), pdf("A1", "P1", make_pdf(tmp_path, "a.pdf", b"alpha"))]
 
     result = zotero_pull.pull(items, pdfs)
 
     assert (pdfs / "page2021.pdf").read_bytes() == b"mine"
-    assert result["skipped"] == [{"key": "page2021", "title": "Alpha"}]
-    assert result["pulled"] == []
+    assert (pdfs / "page2021a.pdf").read_bytes() == b"alpha"
+    assert [p["key"] for p in result["pulled"]] == ["page2021a"]
+    assert result["skipped"] == []
 
 
 def test_paper_without_pdf_and_loose_pdf_are_listed(tmp_path):
@@ -92,7 +93,7 @@ def test_collection_items_paginates():
     collections = [{"key": "C1", "data": {"name": "reviewsystem"}, "meta": {}}]
     page1 = [paper(f"P{i}", "T") for i in range(100)]
     page2 = [paper("P100", "T")]
-    responses = {f"{BASE}/users/0/collections?limit=100": collections,
+    responses = {f"{BASE}/users/0/collections?limit=100&start=0": collections,
                  f"{BASE}/users/0/collections/C1/items?limit=100&start=0": page1,
                  f"{BASE}/users/0/collections/C1/items?limit=100&start=100": page2}
 
@@ -115,7 +116,7 @@ def test_main_lists_collections_when_name_not_found(tmp_path, capsys):
     collections = [{"key": "C1", "data": {"name": "reviewsystem"}, "meta": {}}]
 
     code = zotero_pull.main([str(tmp_path), "--collection", "nope", "--base", BASE],
-                            fetch={f"{BASE}/users/0/collections?limit=100": collections}.__getitem__)
+                            fetch={f"{BASE}/users/0/collections?limit=100&start=0": collections}.__getitem__)
 
     assert code == 1
     assert "reviewsystem" in capsys.readouterr().err
@@ -125,7 +126,7 @@ def test_main_writes_zotero_pull_json(tmp_path):
     src = make_pdf(tmp_path, "a.pdf")
     collections = [{"key": "C1", "data": {"name": "demo"}, "meta": {}}]
     items = [paper("P1", "Alpha", doi="10.1/a"), pdf("A1", "P1", src)]
-    responses = {f"{BASE}/users/0/collections?limit=100": collections,
+    responses = {f"{BASE}/users/0/collections?limit=100&start=0": collections,
                  f"{BASE}/users/0/collections/C1/items?limit=100&start=0": items}
     review = tmp_path / "reviews" / "demo"
 
@@ -211,3 +212,59 @@ def test_existing_target_is_never_overwritten_even_if_check_is_bypassed(tmp_path
     assert (pdfs / "page2021.pdf").read_bytes() == b"mine"
     assert result["skipped"] == [{"key": "page2021", "title": "Alpha"}]
     assert result["pulled"] == []
+
+
+
+def _collection_responses(items, collections=None):
+    collections = collections or [{"key": "C1", "data": {"name": "demo"}, "meta": {}}]
+    return {f"{BASE}/users/0/collections?limit=100&start=0": collections,
+            f"{BASE}/users/0/collections/C1/items?limit=100&start=0": items}
+
+
+def test_rerun_keeps_previous_keys_and_does_not_recopy(tmp_path):
+    review = tmp_path / "reviews" / "demo"
+    alpha_paper = paper("P1", "Alpha", doi="10.1/a", last="Smith", date="2023")
+    beta_paper = paper("P2", "Beta", doi="10.1/b", last="Smith", date="2023")
+    beta_pdf = pdf("A2", "P2", make_pdf(tmp_path, "beta.pdf", b"beta-bytes"))
+    args = [str(review), "--collection", "demo", "--base", BASE]
+
+    run1 = _collection_responses([alpha_paper, beta_paper, beta_pdf])
+    assert zotero_pull.main(args, fetch=run1.__getitem__) == 0
+    assert (review / "pdfs" / "smith2023.pdf").read_bytes() == b"beta-bytes"
+
+    alpha_pdf = pdf("A1", "P1", make_pdf(tmp_path, "alpha.pdf", b"alpha-bytes"))
+    run2 = _collection_responses([alpha_paper, beta_paper, beta_pdf, alpha_pdf])
+    assert zotero_pull.main(args, fetch=run2.__getitem__) == 0
+
+    result = json.loads((review / "search" / "zotero-pull.json").read_text(encoding="utf-8"))
+    assert result["pulled"] == [
+        {"key": "smith2023", "id": "10.1/b", "title": "Beta", "zoteroKey": "P2"},
+        {"key": "smith2023a", "id": "10.1/a", "title": "Alpha", "zoteroKey": "P1"}]
+    assert result["skipped"] == [] and result["noPdf"] == []
+    assert sorted(p.name for p in (review / "pdfs").iterdir()) == ["smith2023.pdf", "smith2023a.pdf"]
+    assert (review / "pdfs" / "smith2023.pdf").read_bytes() == b"beta-bytes"
+    assert (review / "pdfs" / "smith2023a.pdf").read_bytes() == b"alpha-bytes"
+
+
+def test_collections_are_paginated():
+    first = [{"key": f"X{i}", "data": {"name": f"c{i}"}, "meta": {}} for i in range(100)]
+    second = [{"key": "C1", "data": {"name": "demo"}, "meta": {}}]
+    responses = {f"{BASE}/users/0/collections?limit=100&start=0": first,
+                 f"{BASE}/users/0/collections?limit=100&start=100": second,
+                 f"{BASE}/users/0/collections/C1/items?limit=100&start=0": []}
+
+    key, items = zotero_pull.collection_items(BASE, "demo", responses.__getitem__)
+
+    assert key == "C1" and items == []
+
+
+def test_duplicate_collection_names_exit_one(tmp_path, capsys):
+    collections = [{"key": "C1", "data": {"name": "demo"}, "meta": {}},
+                   {"key": "C2", "data": {"name": "demo"}, "meta": {}}]
+
+    code = zotero_pull.main([str(tmp_path), "--collection", "demo", "--base", BASE],
+                            fetch=_collection_responses([], collections).__getitem__)
+
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "有多個同名資料夾" in err and "C1" in err and "C2" in err

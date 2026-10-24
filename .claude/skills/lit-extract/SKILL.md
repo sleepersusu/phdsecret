@@ -43,12 +43,12 @@ description: 流水線的萃取段（自動）：每篇論文派兩個 subagent 
 
 以前在別批做過、文獻庫裡有卡片的篇，不重新萃取。每篇：
 
-1. 先照第 1 節第 3 點清掉 `cards/<key>/` 裡舊的產出（若有），避免舊的 b.json、diff.json、judge.json 被併進沿用的卡片。`uv run scripts/reuse_card.py reviews/<slug> <key> --source <source.review>/<source.key> --clear-relation`。跟提案的關係一律先清空：已有提案模式接著由甲乙重寫，無提案模式本來就是空的；舊關係引用的提案句子可能已經不在新提案裡，留著會讓第 2 步誤判成 PDF 版本不同。
-2. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`，再 `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`（用本批的 PDF 文字核對）。有失敗代表 PDF 版本不同（例：預印本對正式版，頁碼不同）：照第 1 節第 3 點刪掉 `cards/<key>/` 產生的檔案，改走第 2 節完整萃取，`progress.md` 記「<key>：舊卡片引文對不上本批 PDF，改完整萃取」。
-3. 已有提案模式：**同時**派兩個 general-purpose subagent，彼此不知道對方的存在：甲（甲模型）「讀 `.claude/skills/lit-extract/extractor-relation.md` 照做。slug：`<slug>`，key：`<key>`，角色：甲。」；乙（乙模型）同一句，角色：乙。接著 `uv run scripts/diff_cards.py reviews/<slug>/cards/<key> --fields proposalRelation`，有不一致照第 2 節第 2 步派 judge。無提案模式跳過這一步。
-4. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`；`uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`（exit 1 記成例外，同第 2 節第 7 步）；`uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`，失敗照第 2 節第 9 步修一輪。不派 auditor：來源卡片已補過漏。
-5. `uv run scripts/summary_check.py reviews/<slug>/cards/<key>`。沒有摘要或不通過（例：跟提案的關係改了，標記對不上）→ 照第 2 節第 10 步派 summarizer 重寫，修一輪。
-6. `progress.md` 追加一行：`<key>：沿用 <source.review>/<source.key>、跟提案的關係 <已有提案：重寫，不一致 <n>（judge 解決 <n>）／無提案：清空>、引文 <通過數>/<總數>、修 <0 或 1> 輪、摘要 <沿用／重寫／例外>`。
+1. 先照第 1 節第 3 點清掉 `cards/<key>/` 裡舊的產出（若有），避免舊的 b.json、diff.json、judge.json 被併進沿用的卡片。`uv run scripts/reuse_card.py reviews/<slug> <key> --source <source.review>/<source.key> --clear-relation`。跟提案的關係一律先清空：已有提案模式接著由甲乙重寫，無提案模式本來就是空的；舊關係引用的提案句子可能已經不在新提案裡，留著會讓第 2 步誤判成 PDF 版本不同。reuse_card exit 3（來源卡片有待裁決欄位，上一批沒被裁決回寫，沿用會把未裁決的值當成已核對）→ 不沿用，照第 1 節第 3 點清掉產出後改走第 2 節完整萃取，`progress.md` 記「<key>：來源卡片有待裁決欄位（未完成，改走完整萃取）」。
+2. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`，再 `uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`（用本批的 PDF 文字核對）。有失敗代表 PDF 版本不同（例：預印本對正式版，頁碼不同）：照第 1 節第 3 點刪掉 `cards/<key>/` 產生的檔案，改走第 2 節完整萃取，`progress.md` 記「<key>：舊卡片引文對不上本批 PDF（未完成，改走完整萃取）」。這行只是改道的記錄，不算完成；只有第 2 節或本節格式的每篇一行才算完成。
+3. 已有提案模式：**同時**派兩個 general-purpose subagent，彼此不知道對方的存在：甲（甲模型）「讀 `.claude/skills/lit-extract/extractor-relation.md` 照做。slug：`<slug>`，key：`<key>`，角色：甲。」；乙（乙模型）同一句，角色：乙。任一個回 `BLOCKED` → 記成例外，這篇改走第 2 節完整萃取（先照第 1 節第 3 點清掉產出）。接著 `uv run scripts/diff_cards.py reviews/<slug>/cards/<key> --fields proposalRelation`，有不一致照第 2 節第 2 步派 judge。無提案模式跳過這一步。
+4. `uv run scripts/build_card.py reviews/<slug>/cards/<key>`；`uv run scripts/coverage_check.py reviews/<slug>/cards/<key>`（exit 1 記成例外，同第 2 節第 7 步）；`uv run scripts/quote_check.py reviews/<slug> reviews/<slug>/cards/<key>/card.md`，失敗、或 `card.json` 的 `missingEvidence` 不是空的，照第 2 節第 9 步修一輪。不派 auditor：來源卡片已補過漏。
+5. 已有提案模式：一律照第 2 節第 10 步派 summarizer 重寫摘要（跟提案的關係重寫過，舊摘要的標記可能指到不同項目而照樣通過檢查），再跑 `summary_check.py`，修一輪。無提案模式：沿用來源摘要並跑 `uv run scripts/summary_check.py reviews/<slug>/cards/<key>`，沒有摘要或不通過才照第 2 節第 10 步重寫，修一輪。
+6. `progress.md` 追加一行：`<key>：沿用 <source.review>/<source.key>、跟提案的關係 <已有提案：重寫，不一致 <n>（judge 解決 <n>）／無提案：清空>、引文 <通過數>/<總數>、修 <0 或 1> 輪、摘要 <沿用（僅無提案模式）／重寫／例外>`。
 
 ## 3. 收尾
 

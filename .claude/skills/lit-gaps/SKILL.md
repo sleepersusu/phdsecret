@@ -40,7 +40,7 @@ description: 流水線的對照提案段（自動）＋停 2：派 subagent 把�
 3. 驗證數字：卡片引文通過數／總數、補漏總數（各卡 `auditAdded` 加總）、未涵蓋章節總數、缺口清單引文通過數／總數、整條撤回幾條、撤掉部分引文幾條。
 4. 檔案位置：`reading-order.md`、`matrix.md`、`proposal-gaps.md`、`references.csv`、`cards/`、跨批次總表 `library/matrix.md`（附上跨 2 批以上的篇數）。加一句「建議從 `reading-order.md` 開始讀，每篇先看 `summary.md` 再看 `card.md`」。
 5. 「提案沒提到」與「建議補讀」逐條列出（這兩類最可能改變提案）。
-6. 標籤歸併摘要：本批新增的類別、被歸進既有類別的寫法（看 `tag-merge-report.json` 的 `accepted`）、被拒絕的提議、`paper-tags.json` 的 `unmapped`。提醒本人：改類別編輯 `library/tags.json`（改過的設 `"source": "user"`），改單篇編輯 `reviews/<slug>/tag-overrides.json`，改完重跑 `uv run scripts/apply_tags.py reviews/<slug>` 與 `matrix.py`。
+6. 標籤歸併摘要：本批新增的類別、被歸進既有類別的寫法（看 `tag-merge-report.json` 的 `accepted`）、被拒絕的提議、`paper-tags.json` 的 `unmapped`。提醒本人：改類別編輯 `library/tags.json`（改過的設 `"source": "user"`），改單篇編輯 `reviews/<slug>/tag-overrides.json`，改完重跑 `uv run scripts/apply_tags.py reviews/<slug>` 與 `matrix.py`，再跑 `uv run scripts/library_build.py` 更新跨批次文獻庫。
 
 最後一句：「看完要開始寫，打 `/lit-draft`；看不懂某個方法，打 `/teach <想弄懂的東西>`。」
 

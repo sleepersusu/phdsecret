@@ -35,27 +35,32 @@ def flow(counts, rows):
             "screened": len(rows), **by_status}
 
 
+def _one_line(value):
+    """RIS 一行一個欄位，值裡的換行或空行會被當成新欄位或記錄分隔，所以一律壓成一行。"""
+    return " ".join(str(value).split())
+
+
 def to_ris(rows):
     """只收 included 與 toUser；DOI 寫 DO，arXiv／PMID 寫進 N1，讓 Zotero 匯入後仍查得到。"""
     lines = []
     for row in rows:
         if row["status"] not in ("included", "toUser"):
             continue
-        lines += ["TY  - JOUR", f"TI  - {row.get('title') or ''}"]
-        lines += [f"AU  - {author}" for author in row.get("authors") or []]
+        lines += ["TY  - JOUR", f"TI  - {_one_line(row.get('title') or '')}"]
+        lines += [f"AU  - {_one_line(author)}" for author in row.get("authors") or []]
         if row.get("year"):
-            lines.append(f"PY  - {row['year']}")
+            lines.append(f"PY  - {_one_line(row['year'])}")
         if row.get("venue"):
-            lines.append(f"JO  - {row['venue']}")
+            lines.append(f"JO  - {_one_line(row['venue'])}")
         identifier = row["id"]
         if identifier.startswith("10."):
-            lines.append(f"DO  - {identifier}")
+            lines.append(f"DO  - {_one_line(identifier)}")
         elif identifier.startswith("arxiv:"):
-            lines.append(f"N1  - arXiv:{identifier[len('arxiv:'):]}")
+            lines.append(f"N1  - arXiv:{_one_line(identifier[len('arxiv:'):])}")
         elif identifier.startswith("pmid:"):
-            lines.append(f"N1  - PMID: {identifier[len('pmid:'):]}")
+            lines.append(f"N1  - PMID: {_one_line(identifier[len('pmid:'):])}")
         if row.get("abstract"):
-            lines.append(f"AB  - {row['abstract']}")
+            lines.append(f"AB  - {_one_line(row['abstract'])}")
         lines += [f"N1  - status: {row['status']}", "ER  - ", ""]
     return "\n".join(lines)
 

@@ -84,3 +84,19 @@ def test_main_without_screen_files_exits_one(tmp_path):
     (tmp_path / "search" / "pool.json").write_text(json.dumps({"pool": [], "counts": {}}), encoding="utf-8")
 
     assert screen_compare.main([str(tmp_path)]) == 1
+
+
+def test_ris_values_with_newlines_stay_on_one_line():
+    import re
+
+    row = {**paper("10.1/nl", title="Line one\nline two"), "status": "included",
+           "abstract": "Background: x\n\nMethods: y\nER  - fake"}
+
+    ris = screen_compare.to_ris([row])
+    lines = [line for line in ris.split("\n") if line.strip()]
+
+    assert all(re.match(r"^[A-Z][A-Z0-9]  - ", line) for line in lines)
+    assert sum(1 for line in lines if line.startswith("TY  - ")) == 1
+    assert sum(1 for line in lines if line == "ER  - ") == 1
+    assert "TI  - Line one line two" in lines
+    assert "AB  - Background: x Methods: y ER - fake" in lines

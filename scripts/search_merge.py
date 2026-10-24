@@ -20,7 +20,8 @@ def merge(hits, index):
     known = index.get("papers", {})
     pool, already, no_id, seen_read = {}, [], [], set()
     for hit in hits:
-        cid = canonical_id(hit.get("id"))
+        raw = hit.get("id")
+        cid = canonical_id(None if raw is None else str(raw))
         if cid is None:
             no_id.append(hit)
             continue
@@ -53,7 +54,13 @@ def main(argv=None):
     if not hit_paths:
         print(f"{review}/search/hits 底下沒有搜尋結果", file=sys.stderr)
         return 1
-    hits = [h for path in hit_paths for h in json.loads(path.read_text(encoding="utf-8"))]
+    hits = []
+    for path in hit_paths:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, list):
+            print(f"{path} 不是 JSON 清單（應為 [{{...}}, ...]）", file=sys.stderr)
+            return 1
+        hits += loaded
     index_path = Path(args.library) / "index.json"
     index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
 

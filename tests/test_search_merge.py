@@ -69,3 +69,21 @@ def test_main_writes_pool_and_tolerates_missing_library(tmp_path):
 
 def test_main_without_hits_exits_one(tmp_path):
     assert search_merge.main([str(tmp_path), "--library", str(tmp_path / "library")]) == 1
+
+
+def test_non_string_id_does_not_crash():
+    result = search_merge.merge([hit(12345678, "keyword"), hit(None, "keyword")], {})
+
+    assert result["pool"] == []
+    assert result["counts"]["noId"] == 2
+
+
+def test_hits_file_that_is_not_a_list_exits_one(tmp_path, capsys):
+    hits = tmp_path / "search" / "hits"
+    hits.mkdir(parents=True)
+    (hits / "keyword.json").write_text(json.dumps({"hits": []}), encoding="utf-8")
+
+    code = search_merge.main([str(tmp_path), "--library", str(tmp_path / "lib")])
+
+    assert code == 1
+    assert "keyword.json" in capsys.readouterr().err

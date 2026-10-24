@@ -77,6 +77,26 @@ def test_docx_proposal_keeps_headings(tmp_path):
     assert text == "# Background\nSepsis kills millions every year.\n## Hypothesis\n"
 
 
+def test_docx_proposal_keeps_tables_in_document_order(tmp_path):
+    (tmp_path / "pdfs").mkdir()
+    doc = Document()
+    doc.add_heading("Eligibility", level=1)
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Domain"
+    table.cell(0, 1).text = "Proposed criteria"
+    table.cell(1, 0).text = "Population"
+    table.cell(1, 1).text = "Adults receiving home monitoring"
+    doc.add_heading("Search", level=1)
+    doc.save(tmp_path / "proposal.docx")
+
+    extract_text.main([str(tmp_path), "--proposal", str(tmp_path / "proposal.docx")])
+
+    text = (tmp_path / "text" / "proposal.txt").read_text(encoding="utf-8")
+    assert text == (
+        "# Eligibility\nDomain | Proposed criteria\nPopulation | Adults receiving home monitoring\n# Search\n"
+    )
+
+
 def test_pdf_proposal_drops_page_markers(tmp_path):
     (tmp_path / "pdfs").mkdir()
     make_pdf(tmp_path / "proposal.pdf", ["Aims. " + BODY, "Methods. " + BODY])

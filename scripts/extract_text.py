@@ -9,6 +9,9 @@ import sys
 from pathlib import Path
 
 from docx import Document
+from docx.oxml.ns import qn
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 from pypdf.errors import PdfReadError
 
 from pdfpages import open_pdf, page_texts
@@ -79,13 +82,32 @@ def _proposal_text(path):
 
 
 def _docx_text(path):
+    """依文件順序取段落與表格：提案常把納入條件、萃取欄位放在表格裡，漏掉表格會讓對照誤判成「提案沒提到」。"""
+    document = Document(path)
     lines = []
-    for paragraph in Document(path).paragraphs:
-        text = paragraph.text.strip()
-        if not text:
-            continue
-        lines.append(_heading_prefix(paragraph.style.name) + text)
+    for child in document.element.body.iterchildren():
+        if child.tag == qn("w:p"):
+            paragraph = Paragraph(child, document)
+            text = paragraph.text.strip()
+            if text:
+                lines.append(_heading_prefix(paragraph.style.name) + text)
+        elif child.tag == qn("w:tbl"):
+            lines += _table_lines(Table(child, document))
     return "\n".join(lines) + "\n"
+
+
+def _table_lines(table):
+    """每列一行，儲存格以「 | 」分隔；合併儲存格在 python-docx 會重複出現，相鄰重複的只留一個。"""
+    lines = []
+    for row in table.rows:
+        cells = []
+        for cell in row.cells:
+            text = " ".join(cell.text.split())
+            if not cells or text != cells[-1]:
+                cells.append(text)
+        if any(cells):
+            lines.append(" | ".join(cells))
+    return lines
 
 
 def _heading_prefix(style_name):

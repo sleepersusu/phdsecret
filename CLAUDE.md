@@ -11,6 +11,7 @@
 
 | 階段 | stage | skill | 誰 |
 |---|---|---|---|
+| 停 0 找文獻（選用） | `stop0` | `/lit-search` | 本人在場（搜尋與篩選自動） |
 | 停 1 定方向 | `stop1` | `/lit-protocol` | 本人在場 |
 | 萃取 | `auto:extract` | `/lit-extract` | 自動 |
 | 參考文獻合併 | `auto:refs` | `/lit-refs` | 自動 |
@@ -36,6 +37,7 @@
 
 | 階段 | 必要 | 選用 |
 |---|---|---|
+| 停 0 | `grilling`、`paper-lookup` | — |
 | 停 1 | `grilling`、`domain-modeling`、`pdf` | `deep-research`；提案是 .docx 時 `docx` 改為必要 |
 | 萃取 | `pdf` | — |
 | 參考文獻合併 | `citation-management` | — |

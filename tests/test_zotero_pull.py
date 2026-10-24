@@ -268,3 +268,18 @@ def test_duplicate_collection_names_exit_one(tmp_path, capsys):
     err = capsys.readouterr().err
     assert code == 1
     assert "有多個同名資料夾" in err and "C1" in err and "C2" in err
+
+
+def test_summary_separates_new_and_cumulative_counts(tmp_path, capsys):
+    review = tmp_path / "reviews" / "demo"
+    responses = _collection_responses([paper("P1", "Alpha", doi="10.1/a"),
+                                       pdf("A1", "P1", make_pdf(tmp_path, "a.pdf"))])
+    args = [str(review), "--collection", "demo", "--base", BASE]
+
+    zotero_pull.main(args, fetch=responses.__getitem__)
+    first = capsys.readouterr().out
+    zotero_pull.main(args, fetch=responses.__getitem__)
+    second = capsys.readouterr().out
+
+    assert "本次新複製 1 篇（累計 1 篇）" in first
+    assert "本次新複製 0 篇（累計 1 篇）" in second

@@ -65,5 +65,5 @@ description: 流水線的停 0：從研究問題出發找文獻。跟本人定�
 ## 6. 讀回 PDF
 
 1. `uv run scripts/zotero_pull.py reviews/<slug> --collection <slug>`。連不上或找不到資料夾時，把腳本的訊息轉告本人，等本人處理後重跑。
-2. 呈現 `search/zotero-pull.json`：複製了幾篇；`noPdf`（請本人在 Zotero 手動找 PDF，或從學校圖書館下載後拖進該條目）；`noMetadata`（請本人對它按右鍵 →「擷取 PDF 的中繼資料」）；`skipped`（複製瞬間撞名，沒有覆蓋）。本人處理後可重跑第 1 步：重跑是安全的，先前已複製的論文保留原本的 key、不會再複製，新補上 PDF 的論文只會接在後面取新的 key。`zotero_pull.py` 從不覆蓋 `pdfs/` 裡已有的檔；若複製中途失敗（少見，腳本會中止並報錯），請本人自己刪掉 `pdfs/` 裡那一個不完整的檔再重跑（流水線不刪 `pdfs/` 的檔）。
+2. 呈現 `search/zotero-pull.json`：本次新複製幾篇、累計幾篇；`noPdf`（請本人在 Zotero 手動找 PDF，或從學校圖書館下載後拖進該條目）；`noMetadata`（請本人對它按右鍵 →「擷取 PDF 的中繼資料」）；`skipped`（複製瞬間撞名，沒有覆蓋）。本人處理後可重跑第 1 步：重跑是安全的，先前已複製的論文保留原本的 key、不會再複製，新補上 PDF 的論文只會接在後面取新的 key。`zotero_pull.py` 從不覆蓋 `pdfs/` 裡已有的檔；若複製中途失敗（少見，腳本會中止並報錯），請本人自己刪掉 `pdfs/` 裡那一個不完整的檔再重跑（流水線不刪 `pdfs/` 的檔）。
 3. `state.json` 改 `stop1`，`note`「PDF 已就緒 <n> 篇、缺 PDF <n> 篇」；`progress.md` 追加數字。接著執行 `/lit-protocol`。

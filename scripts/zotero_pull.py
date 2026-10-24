@@ -149,7 +149,7 @@ def main(argv=None, fetch=fetch_json):
     result = pull(items, review / "pdfs", previous)
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"複製 {len(result['pulled'])} 篇；缺 PDF {len(result['noPdf'])} 篇；已存在未覆蓋 {len(result['skipped'])} 篇；"
+    print(f"本次新複製 {len(result['pulled']) - len(previous)} 篇（累計 {len(result['pulled'])} 篇）；缺 PDF {len(result['noPdf'])} 篇；已存在未覆蓋 {len(result['skipped'])} 篇；"
           f"沒有書目資料的 PDF {len(result['noMetadata'])} 個")
     for entry in result["noMetadata"]:
         print(f"- 沒有書目資料：{entry['title']}（在 Zotero 對它按右鍵 →「擷取 PDF 的中繼資料」後重跑）")

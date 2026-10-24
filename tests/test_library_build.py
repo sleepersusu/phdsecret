@@ -14,11 +14,11 @@ def card(key):
         "methods": [{"value": "LSTM", "quote": "q", "page": 2}]}}
 
 
-def make_review(root, name, papers, updated="2026-10-01T00:00:00", cards=(), paper_tags=None, refs=None):
+def make_review(root, name, papers, updated="2026-10-01T00:00:00", cards=(), paper_tags=None, refs=None, stage="stop2"):
     d = root / "reviews" / name
     (d / "cards").mkdir(parents=True)
     (d / "papers.json").write_text(json.dumps(papers, ensure_ascii=False), encoding="utf-8")
-    (d / "state.json").write_text(json.dumps({"stage": "stop2", "note": "", "updatedAt": updated}), encoding="utf-8")
+    (d / "state.json").write_text(json.dumps({"stage": stage, "note": "", "updatedAt": updated}), encoding="utf-8")
     for key in cards:
         (d / "cards" / key).mkdir()
         (d / "cards" / key / "card.json").write_text(json.dumps(card(key), ensure_ascii=False), encoding="utf-8")
@@ -123,9 +123,49 @@ def test_references_merge_across_reviews_and_mark_corpus(tmp_path):
     rows = library_build.build_references(index, reviews)
 
     shared = [r for r in rows if r["doi"] == "10.9/zzz"][0]
-    assert shared["citedBy"] == "r1/a;r2/x"
+    assert shared["citedBy"] == "10.1000/abc;10.1000/def"
     assert shared["citedByCount"] == 2
     assert [r for r in rows if r["doi"] == "10.1000/abc"][0]["inCorpus"] == "10.1000/abc"
+
+
+def test_same_paper_in_two_reviews_counts_once_as_citer(tmp_path):
+    ref = {"title": "Shared ref", "year": "2020", "doi": "10.9/zzz", "raw": "Shared ref 2020"}
+    make_review(tmp_path, "r1", [{"key": "a", "id": "10.1000/abc", "title": "A"}], cards=["a"], refs=[{**ref, "citedBy": "a"}])
+    make_review(tmp_path, "r2", [{"key": "x", "id": "10.1000/abc", "title": "A"}], cards=["x"], refs=[{**ref, "citedBy": "x"}])
+
+    reviews, index = build(tmp_path)
+    rows = library_build.build_references(index, reviews)
+
+    assert rows[0]["citedByCount"] == 1
+    assert rows[0]["citedBy"] == "10.1000/abc"
+
+
+def test_unindexed_citer_keeps_review_key(tmp_path):
+    make_review(tmp_path, "r1", [{"key": "a", "id": "", "title": "A"}], cards=["a"], refs=[
+        {"title": "Shared ref", "year": "2020", "doi": "10.9/zzz", "citedBy": "a", "raw": "Shared ref 2020"}])
+
+    reviews, index = build(tmp_path)
+    rows = library_build.build_references(index, reviews)
+
+    assert rows[0]["citedBy"] == "r1/a"
+
+
+def test_primary_prefers_finished_review_over_newer_unfinished(tmp_path):
+    make_review(tmp_path, "r1", [{"key": "a", "id": "10.1000/abc", "title": "A"}], "2026-10-01T00:00:00", ["a"], stage="stop2")
+    make_review(tmp_path, "r2", [{"key": "x", "id": "10.1000/abc", "title": "A"}], "2026-10-05T00:00:00", ["x"], stage="auto:extract")
+
+    _, index = build(tmp_path)
+
+    assert index["papers"]["10.1000/abc"]["primary"] == {"review": "r1", "key": "a"}
+
+
+def test_primary_falls_back_to_newest_when_none_finished(tmp_path):
+    make_review(tmp_path, "r1", [{"key": "a", "id": "10.1000/abc", "title": "A"}], "2026-10-01T00:00:00", ["a"], stage="auto:extract")
+    make_review(tmp_path, "r2", [{"key": "x", "id": "10.1000/abc", "title": "A"}], "2026-10-05T00:00:00", ["x"], stage="auto:refs")
+
+    _, index = build(tmp_path)
+
+    assert index["papers"]["10.1000/abc"]["primary"] == {"review": "r2", "key": "x"}
 
 
 def test_main_writes_outputs_and_never_touches_tags_json(tmp_path):

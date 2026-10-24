@@ -16,6 +16,7 @@ from matrix import _cell, _escape
 from paperid import canonical_id
 
 FUZZY = 0.9
+FINISHED_STAGES = ("stop2", "draft")
 
 
 def load_reviews(reviews_dir):
@@ -30,6 +31,7 @@ def load_reviews(reviews_dir):
             "name": review_dir.name,
             "papers": _load(review_dir / "papers.json", []),
             "updatedAt": _load(review_dir / "state.json", {}).get("updatedAt", ""),
+            "stage": _load(review_dir / "state.json", {}).get("stage", ""),
             "cards": cards,
             "paperTags": _load(review_dir / "paper-tags.json", {}),
             "references": _read_csv(review_dir / "references.csv"),
@@ -38,7 +40,8 @@ def load_reviews(reviews_dir):
 
 
 def build_index(reviews):
-    """以正規識別碼合併各批的同一篇；primary 取有卡片且批次最近更新者，同時間依 review 名稱。"""
+    """以正規識別碼合併各批的同一篇；primary 優先取有卡片且已完成（stage 為 stop2 或 draft）的批次，
+    都沒完成才退而取任何有卡片的批次；同一池內取最近更新者，同時間依 review 名稱。"""
     by_name = {review["name"]: review for review in reviews}
     papers, unindexed = {}, []
     for review in reviews:
@@ -56,7 +59,8 @@ def build_index(reviews):
         with_card = sorted((a for a in entry["appearances"] if a["hasCard"]), key=lambda a: a["review"])
         if not with_card:
             continue
-        best = max(with_card, key=lambda a: by_name[a["review"]]["updatedAt"])
+        finished = [a for a in with_card if by_name[a["review"]]["stage"] in FINISHED_STAGES]
+        best = max(finished or with_card, key=lambda a: by_name[a["review"]]["updatedAt"])
         entry["primary"] = {"review": best["review"], "key": best["key"]}
         review = by_name[best["review"]]
         tags = review["paperTags"].get(best["key"]) or {}
@@ -84,14 +88,17 @@ def render_matrix(index, reviews):
 
 
 def build_references(index, reviews):
-    """各批 references.csv 已去重、已核對；依 citedBy 展開成 <review>/<key> 的引用後，沿用 merge_refs 的分組合併。"""
+    """各批 references.csv 已去重、已核對；依 citedBy 展開成引用後，沿用 merge_refs 的分組合併。
+    引用者以正規識別碼為鍵（同一篇在兩批都讀過只算一次），文獻庫沒索引到的引用者才保留 <review>/<key>，
+    所以 citedBy 列的是正規識別碼，或未索引者的 review/key。"""
+    canonical = {(a["review"], a["key"]): cid for cid, paper in index["papers"].items() for a in paper["appearances"]}
     entries = []
     for review in reviews:
         for row in review["references"]:
             ref = {"doi": row.get("doi") or None, "title": row.get("title") or "", "year": row.get("year") or "",
                    "firstAuthor": row.get("firstAuthor") or "", "raw": row.get("raw") or ""}
             for cited in filter(None, (row.get("citedBy") or "").split(";")):
-                entries.append((f"{review['name']}/{cited}", ref))
+                entries.append((canonical.get((review["name"], cited), f"{review['name']}/{cited}"), ref))
     groups = merge_refs._group(entries, FUZZY)
     corpus = [{"key": cid, "id": cid, "title": entry["title"]} for cid, entry in index["papers"].items()]
     return merge_refs._rows(groups, corpus, FUZZY)

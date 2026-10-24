@@ -4,6 +4,9 @@
 key 改成本批的 key：引文標記會照新 key 渲染，再用本批 PDF 核對，對不上就代表 PDF 版本不同。
 上一批的待裁決、缺引文、補漏計數是那一批的狀態，不帶過來，由本批重新合成。
 無提案模式加 --clear-relation：沒有提案可對照，跟提案的關係清空。來源有 summary.md 就一併複製。
+來源 audit.json 的 sectionReasons（空章節的說明）一併帶過來，coverage_check 只從那裡讀；additions 不帶，免得重複套用。
+來源卡片 pending 非空就拒絕（exit 3）：上一批的待裁決沒有被本人裁決回寫，
+沿用會把未裁決的值當成已核對，這篇要改走完整萃取。
 """
 import argparse
 import copy
@@ -31,10 +34,22 @@ def main(argv=None):
         print(f"找不到來源卡片 {source_path}", file=sys.stderr)
         return 1
 
-    card = reuse(json.loads(source_path.read_text(encoding="utf-8")), args.key, args.clear_relation)
+    source_card = json.loads(source_path.read_text(encoding="utf-8"))
+    if source_card.get("pending"):
+        fields = "、".join(str(item.get("field", item)) if isinstance(item, dict) else str(item) for item in source_card["pending"])
+        print(f"{args.key}: 來源卡片有待裁決欄位（{fields}），不沿用，這篇要改走完整萃取", file=sys.stderr)
+        return 3
+
+    card = reuse(source_card, args.key, args.clear_relation)
     target = review / "cards" / args.key
     target.mkdir(parents=True, exist_ok=True)
     (target / "a.json").write_text(json.dumps(card, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    audit_path = source_dir / "audit.json"
+    if audit_path.exists():
+        reasons = json.loads(audit_path.read_text(encoding="utf-8")).get("sectionReasons") or []
+        if reasons:
+            (target / "audit.json").write_text(
+                json.dumps({"sectionReasons": reasons}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     summary = source_dir / "summary.md"
     if summary.exists():
         (target / "summary.md").write_text(summary.read_text(encoding="utf-8"), encoding="utf-8")

@@ -65,7 +65,14 @@ def compare_narrative(a, b, fields=None):
 def main(argv=None):
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     card_dir = Path(args.card_dir)
-    fields = set(args.fields.split(",")) if args.fields else None
+    fields = None
+    if args.fields:
+        fields = {name.strip() for name in args.fields.split(",") if name.strip()}
+        known = {field for field, _, _ in STRUCTURED} | set(DUAL_NARRATIVE)
+        unknown = sorted(fields - known)
+        if unknown:
+            print(f"--fields 有不認得的欄位：{'、'.join(unknown)}（打錯會得到空的比對結果，誤判甲通過）", file=sys.stderr)
+            return 2
     a_path, b_path = card_dir / "a.json", card_dir / "b.json"
     if not a_path.exists() or not b_path.exists():
         print(f"{card_dir} 要同時有 a.json 與 b.json", file=sys.stderr)

@@ -30,10 +30,12 @@ def test_clear_relation_empties_proposal_relation_without_touching_source():
     assert len(SOURCE["narrative"]["proposalRelation"]) == 1
 
 
-def make_source(tmp_path, with_summary=True):
+def make_source(tmp_path, with_summary=True, source=None):
     source_dir = tmp_path / "reviews" / "old" / "cards" / "smith2023"
     source_dir.mkdir(parents=True)
-    (source_dir / "card.json").write_text(json.dumps(SOURCE, ensure_ascii=False), encoding="utf-8")
+    if source is None:
+        source = {**SOURCE, "pending": []}
+    (source_dir / "card.json").write_text(json.dumps(source, ensure_ascii=False), encoding="utf-8")
     if with_summary:
         (source_dir / "summary.md").write_text("摘要 [findings#1]。", encoding="utf-8")
     review = tmp_path / "reviews" / "new"
@@ -66,3 +68,32 @@ def test_main_with_missing_source_exits_one(tmp_path):
     _, review = make_source(tmp_path)
 
     assert reuse_card.main([str(review), "s23", "--source", "old/nope"]) == 1
+
+
+def test_main_with_pending_source_exits_three_and_writes_nothing(tmp_path, capsys):
+    _, review = make_source(tmp_path, source=SOURCE)
+
+    code = reuse_card.main([str(review), "s23", "--source", "old/smith2023"])
+
+    assert code == 3
+    assert "results" in capsys.readouterr().err
+    assert not (review / "cards" / "s23" / "a.json").exists()
+
+
+def test_main_copies_only_section_reasons_from_source_audit(tmp_path):
+    source_dir, review = make_source(tmp_path)
+    audit = {"additions": [{"field": "findings", "text": "t"}], "sectionReasons": [{"section": "Methods", "reason": "只有方法學"}]}
+    (source_dir / "audit.json").write_text(json.dumps(audit, ensure_ascii=False), encoding="utf-8")
+
+    reuse_card.main([str(review), "s23", "--source", "old/smith2023"])
+
+    written = json.loads((review / "cards" / "s23" / "audit.json").read_text(encoding="utf-8"))
+    assert written == {"sectionReasons": audit["sectionReasons"]}
+
+
+def test_main_without_source_audit_writes_no_audit(tmp_path):
+    _, review = make_source(tmp_path)
+
+    reuse_card.main([str(review), "s23", "--source", "old/smith2023"])
+
+    assert not (review / "cards" / "s23" / "audit.json").exists()

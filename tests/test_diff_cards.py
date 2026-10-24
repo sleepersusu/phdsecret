@@ -224,3 +224,28 @@ def test_main_fields_reports_only_requested_disagreement(tmp_path):
 
     written = json.loads((tmp_path / "diff.json").read_text(encoding="utf-8"))
     assert [d["field"] for d in written["disagreements"]] == ["proposalRelation"]
+
+
+def test_main_fields_strips_spaces_around_names(tmp_path):
+    a = {"key": "k", "structured": structured(methods=[item("Transformer")], results=[item("AUROC 0.89")]), "narrative": narrative()}
+    b = {"key": "k", "structured": structured(methods=[item("LSTM")], results=[item("AUROC 0.70")]), "narrative": narrative()}
+    (tmp_path / "a.json").write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "b.json").write_text(json.dumps(b, ensure_ascii=False), encoding="utf-8")
+
+    code = diff_cards.main([str(tmp_path), "--fields", "methods, results"])
+
+    written = json.loads((tmp_path / "diff.json").read_text(encoding="utf-8"))
+    assert code == 0
+    assert sorted(d["field"] for d in written["disagreements"]) == ["methods", "results"]
+
+
+def test_main_fields_unknown_name_exits_two(tmp_path, capsys):
+    a = {"key": "k", "structured": structured(), "narrative": narrative()}
+    (tmp_path / "a.json").write_text(json.dumps(a), encoding="utf-8")
+    (tmp_path / "b.json").write_text(json.dumps(a), encoding="utf-8")
+
+    code = diff_cards.main([str(tmp_path), "--fields", "methods,proposalRelaton"])
+
+    assert code == 2
+    assert "proposalRelaton" in capsys.readouterr().err
+    assert not (tmp_path / "diff.json").exists()
